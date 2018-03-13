@@ -3,6 +3,7 @@ import java.awt.*;
 import java.awt.event.*;
 import java.io.*;
 import java.net.*;
+import java.util.ArrayList;
 
 public class Vrav extends Applet implements Runnable
 {
@@ -10,19 +11,20 @@ public class Vrav extends Applet implements Runnable
 
 	Socket socket;
 	TextArea t1 = new TextArea();
-	TextArea t2 = new TextArea();
 	boolean zapisuje = false;
 	Thread th;
 	private static final int port = 2004;
- 
-	OutputStream wr; 
-	InputStream rd;
+	boolean server;
+	
+	ArrayList<ClientHandler> clients = new ArrayList<>();
+	
+	ObjectOutputStream wr; 
+	ObjectInputStream rd;
 	
 	public void init()
 	{
-		add(t1); add(t2);
-		t1.setEditable(false);
-		listenery();		
+		add(t1); 
+		//listenery();		
 		Thread th = new Thread(this);
 		th.start();
 	}
@@ -35,15 +37,20 @@ public class Vrav extends Applet implements Runnable
 		    	// first try to connect to other party, if it is already listening
 			    socket = new Socket("localhost", port);
 			    System.out.println("Vytvoreny socket pre odosielanie");
+			    server = false;
 		    } catch (ConnectException e) {
+		    	server = true;
 		    	// otherwise create a listening socket and wait for the other party to connect
 			    System.out.println("Druha strana este nie je pripravena, cakam na spojenie...");
 		    	ServerSocket srv = new ServerSocket(port);
 			    socket = srv.accept();
+		    	clients.add(new ClientHandler());
+		    	add(new TextArea());
 			    System.out.println("Vytvoreny socket pre prijimanie");
 			}
-		    wr = socket.getOutputStream();
-            rd = socket.getInputStream();
+		    wr = new ObjectOutputStream(socket.getOutputStream());
+            rd = new ObjectInputStream(socket.getInputStream());
+            sendInfoFromOtherClients();
 		} catch (UnknownHostException e) {
 			e.printStackTrace();
 		} catch (IOException e) {
@@ -58,12 +65,12 @@ public class Vrav extends Applet implements Runnable
 
 	public void listenery()
 	{
-		t2.addTextListener(new TextListener(){
+		t1.addTextListener(new TextListener(){
 			@Override
 			public void textValueChanged(TextEvent arg0) {
 				//TextComponent tc = (TextComponent)arg0.getSource();
 			    //String messageOut = tc.getText();
-				String messageOut = t2.getText();
+				String messageOut = t1.getText();
 				posliSpravu(messageOut);
 			}			
 		});
@@ -95,19 +102,23 @@ public class Vrav extends Applet implements Runnable
 	
 	public boolean prijmiSpravu()
 	{
-		try {
-			int nbts = rd.read() + (rd.read() << 8);
-			byte bts[] = new byte[nbts];
-			int i = 0; // how many bytes did we read so far
-			do {
-				int j = rd.read(bts, i, bts.length - i);
-				if (j > 0) i += j;
-				else break;
-			} while (i < bts.length);
-			t1.setText(new String(bts));
-		} catch (IOException e) {
-			return false;
-		}
+			try {
+				ArrayList<ClientHandler> cl = (ArrayList<ClientHandler>) rd.readObject();
+				for(ClientHandler c : cl){
+					
+					add( new TextArea());
+					
+					//this.repaint();
+				}
+			} catch (Exception e) {
+				
+			}
+			//if(!bts.equals("")) t1.setText(new String(bts));
 		return true;
+	}
+	
+	public void sendInfoFromOtherClients() throws IOException{
+		   wr.writeObject(clients);
+		   wr.flush();
 	}
 }
