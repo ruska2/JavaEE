@@ -6,6 +6,7 @@ import java.net.*;
 import java.util.HashMap;
 import java.util.Map.Entry;
 import msg.AddAreaMsg;
+import msg.RemoveAreaMsg;
 import msg.Textt;
 
 public class Vrav extends Applet implements Runnable
@@ -48,7 +49,11 @@ public class Vrav extends Applet implements Runnable
 	
 	private void sendMsg(String msg) {
 		try {
-			wr.writeObject(msg);
+			synchronized(wr) {
+				wr.writeObject(msg);
+				wr.flush();
+				}
+			
 		} catch (IOException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
@@ -70,7 +75,6 @@ public class Vrav extends Applet implements Runnable
 		    this.doLayout();
 		    client.addTextArea(0);
 			new Thread(client).start();
-			//System.out.println(clients);
 			
 			for(Entry<Integer,ClientHandler> c: clients.entrySet()) {
 				if(counter != c.getKey()) {
@@ -80,18 +84,6 @@ public class Vrav extends Applet implements Runnable
 			}
 			
 	}
-	
-	public void listenery()
-	{
-		t1.addTextListener(new TextListener(){
-			@Override
-			public void textValueChanged(TextEvent arg0) {
-				String messageOut = t1.getText();
-				//Send msg to other clients;
-			}			
-		});
-	}
-
 
 	public void run() 
 	{
@@ -119,7 +111,7 @@ public class Vrav extends Applet implements Runnable
 	}
 	
 	public boolean getMsg()
-	{
+	{	synchronized(rd) {
 			try {
 				AddAreaMsg cl = (AddAreaMsg) rd.readObject();
 				TextArea area = new TextArea();
@@ -130,19 +122,43 @@ public class Vrav extends Applet implements Runnable
 			} catch (Exception e) {
 				try {
 					Textt t = (Textt) rd.readObject();
+					textAreas.get(t.id).setText(t.msg);
+					textAreas.get(t.id).doLayout();
 				}catch(Exception e1) {
-					
+					try {
+						RemoveAreaMsg area = (RemoveAreaMsg) rd.readObject();
+						
+						clients.remove(area.id);
+						remove(textAreas.get(area.id));
+						textAreas.remove(area.id);
+						this.doLayout();
+						System.out.println("rempve");
+					}catch(Exception e2) {
+					}
 				}
 			}
+		}
 		return true;
 	}
 	
 	public void sendMsgForAll(int id, String text) {
-		System.out.println("call");
 		for(Entry<Integer,ClientHandler> c: clients.entrySet()) {
-			if(id != c.getKey()) {
 				textAreas.get(id).setText(text);
-			}
+				textAreas.get(id).doLayout();
+				if(id != c.getKey()) {
+					c.getValue().sendMsg(new Textt(id,text));
+				}
+		}
+	}
+	
+	
+	public void removeClient(int id) {
+		clients.remove(id);
+		remove(textAreas.get(id));
+		textAreas.remove(id);
+		System.out.println(clients + "..." + id);
+		for(Entry<Integer,ClientHandler> c: clients.entrySet()) {
+			c.getValue().removeTextArea(new RemoveAreaMsg(id));
 		}
 	}
 	

@@ -2,12 +2,14 @@ package msg;
 
 import java.io.Serializable;
 
-public class Textt extends Message implements Serializable {
+public class Textt implements Serializable {
 
-	String msg;
+	public String msg;
+	public int id;
 	
-	public Textt(String m) {
+	public Textt(int id, String m) {
 		msg = m;
+		this.id = id;
 	}
 	
 	@Override

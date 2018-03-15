@@ -5,6 +5,7 @@ import java.io.ObjectOutputStream;
 import java.net.Socket;
 
 import msg.AddAreaMsg;
+import msg.RemoveAreaMsg;
 import msg.Textt;
 
 public class ClientHandler implements Runnable {
@@ -29,7 +30,6 @@ public class ClientHandler implements Runnable {
 	@Override
 	public void run() {
 		while(getMsg());
-		
 	}
 
 
@@ -44,12 +44,44 @@ public class ClientHandler implements Runnable {
 	}
 	
 	public boolean getMsg() {
+		String cl;
 		try {
-			String cl = (String) inp.readObject();
+			synchronized(inp) {
+				cl = (String) inp.readObject();
+			}
 			server.sendMsgForAll(id,cl);
 		} catch (Exception e) {
+			server.removeClient(id);
+			return false;
 		}
 		return true;
 	}
-
+	
+	
+	public void sendMsg(Textt text) {
+		try {
+			
+			synchronized(out) {
+				out.writeObject(text);
+				out.flush();
+			}
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		
+	}
+	
+	public void removeTextArea(RemoveAreaMsg area) {
+		try {
+			
+			synchronized(out) {
+				out.writeObject(area);
+				out.flush();
+			}
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+	}
 }
