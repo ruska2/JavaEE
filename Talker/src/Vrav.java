@@ -23,6 +23,7 @@ public class Vrav extends Applet implements Runnable
 	Button canv = new Button("Canvas");
 	Frame f= new Frame("Canvas");
 	Canvas c = new Canvas();
+	String text = new String();
 	
 	
 	HashMap<Integer,ClientHandler> clients = new HashMap<>();
@@ -52,7 +53,7 @@ public class Vrav extends Applet implements Runnable
 			public void textValueChanged(TextEvent arg0) {
 				// TODO Auto-generated method stub
 				String msg = t1.getText();
-				sendMsg(msg);
+				sendMsg(msg.substring(msg.length()-1, msg.length()));
 			}
 		});
 		
@@ -143,7 +144,7 @@ public class Vrav extends Applet implements Runnable
 				}
 			}else {
 				for(Entry<Integer,ClientHandler> c: clients.entrySet()) {
-					c.getValue().sendMsg("T 0 " + t1.getText());
+					c.getValue().sendMsg("T 0 " + msg);
 				}
 				
 			}
@@ -258,7 +259,7 @@ public class Vrav extends Applet implements Runnable
 				case "T":
 					id = Integer.parseInt(msg[1]);
 					String text = msg[2];
-					textAreas.get(id).setText(text);
+					textAreas.get(id).setText(textAreas.get(id).getText() + text);
 					break;
 				case "D":
 					int x = Integer.parseInt(msg[1]);
@@ -276,7 +277,7 @@ public class Vrav extends Applet implements Runnable
 	
 	public void sendMsgForAll(int id, String text) {
 		String msg = "T " + id + " " + text;
-		textAreas.get(id).setText(text);
+		textAreas.get(id).setText(textAreas.get(id).getText() + text);
 		textAreas.get(id).doLayout();
 		for(Entry<Integer,ClientHandler> c: clients.entrySet()) {
 				if(id != c.getKey()) {
