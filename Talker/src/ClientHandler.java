@@ -60,7 +60,7 @@ public class ClientHandler implements Runnable {
 			return false;
 		}
 		if(cl != "") {
-			if(cl.charAt(0) == 'D') {
+			if(cl.length() > 0 && cl.charAt(0) == 'D') {
 				server.draw(cl);
 			}else {
 				server.sendMsgForAll(id, cl);

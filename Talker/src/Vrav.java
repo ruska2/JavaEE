@@ -19,7 +19,6 @@ public class Vrav extends Applet implements Runnable
 	public int counter;
 	ServerSocket srv;
 	Button clear = new Button("Clear History");
-	Button smiley = new Button("Send smiley");
 	Button canv = new Button("Canvas");
 	Frame f= new Frame("Canvas");
 	Canvas c = new Canvas();
@@ -37,7 +36,6 @@ public class Vrav extends Applet implements Runnable
 	{
 		add(t1); 
 		add(clear);
-		add(smiley);
 		add(canv);
 		Thread th = new Thread(this);
 		th.start();
@@ -52,8 +50,14 @@ public class Vrav extends Applet implements Runnable
 			@Override
 			public void textValueChanged(TextEvent arg0) {
 				// TODO Auto-generated method stub
-				String msg = t1.getText();
-				sendMsg(msg.substring(msg.length()-1, msg.length()));
+				if(text.length() == 0 || text.length() <= t1.getText().length()) {
+					String msg = t1.getText();
+					sendMsg(msg.substring(msg.length()-1, msg.length()));
+				}else {
+					sendMsg("");
+				}
+				text = t1.getText();
+				
 			}
 		});
 		
@@ -69,15 +73,7 @@ public class Vrav extends Applet implements Runnable
 			
 		});
 		
-		smiley.addActionListener(new ActionListener() {
-
-			@Override
-			public void actionPerformed(ActionEvent arg0) {
-				// TODO Auto-generated method stub
-				t1.setText(t1.getText() + "\uD83D\uDE40");
-			}
-			
-		});
+		
 		
 		 //f.setLayout(null);  
 		 f.setSize(400, 400);
@@ -171,7 +167,9 @@ public class Vrav extends Applet implements Runnable
 		String[] p = msg.split(" ");
 		int x = Integer.parseInt(p[1]);
 		int y = Integer.parseInt(p[2]);
-		c.getGraphics().fillOval(x, y, 20, 20);
+		try{
+			c.getGraphics().fillOval(x, y, 20, 20);
+		}catch(Exception e) {}
 		
 		for(Entry<Integer,ClientHandler> c: clients.entrySet()) {
 			c.getValue().sendGraphics(msg);
@@ -241,6 +239,7 @@ public class Vrav extends Applet implements Runnable
 			
 				String[] msg = str.split(" ");
 				int id;
+			
 				switch(msg[0]) {
 				case "A":
 					id = Integer.parseInt(msg[1]);
@@ -257,9 +256,15 @@ public class Vrav extends Applet implements Runnable
 					doLayout();
 					break;
 				case "T":
+					//System.out.println(msg.length);
 					id = Integer.parseInt(msg[1]);
-					String text = msg[2];
-					textAreas.get(id).setText(textAreas.get(id).getText() + text);
+					if(msg.length > 2) {
+						String text = msg[2];
+						textAreas.get(id).setText(textAreas.get(id).getText() + text);
+					}else {
+						String t = textAreas.get(id).getText();
+						textAreas.get(id).setText(t.substring(0,t.length()-1));
+					}
 					break;
 				case "D":
 					int x = Integer.parseInt(msg[1]);
@@ -277,7 +282,12 @@ public class Vrav extends Applet implements Runnable
 	
 	public void sendMsgForAll(int id, String text) {
 		String msg = "T " + id + " " + text;
-		textAreas.get(id).setText(textAreas.get(id).getText() + text);
+		if(text.equals("")) {
+			String t = textAreas.get(id).getText();
+			textAreas.get(id).setText(t.substring(0,t.length()-1));
+		}else {
+			textAreas.get(id).setText(textAreas.get(id).getText() + text);
+		}
 		textAreas.get(id).doLayout();
 		for(Entry<Integer,ClientHandler> c: clients.entrySet()) {
 				if(id != c.getKey()) {
