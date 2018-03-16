@@ -1,3 +1,12 @@
+/*
+ * Hotove ulohy:
+ * 1.
+ * 4. kreslenie pre viacerych
+ * 3. mazanie hystorie
+ * 5. posielau sa iba zmeny bez moznostou editacie
+ * */
+
+
 import java.applet.Applet;
 import java.awt.*;
 import java.awt.event.*;
@@ -5,6 +14,8 @@ import java.io.*;
 import java.net.*;
 import java.util.HashMap;
 import java.util.Map.Entry;
+
+
 
 
 
