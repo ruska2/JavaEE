@@ -60,7 +60,12 @@ public class ClientHandler implements Runnable {
 			return false;
 		}
 		if(cl != "") {
-			server.sendMsgForAll(id, cl);
+			if(cl.charAt(0) == 'D') {
+				server.draw(cl);
+			}else {
+				server.sendMsgForAll(id, cl);
+			}
+			
 		}
 		return true;
 	}
@@ -82,6 +87,19 @@ public class ClientHandler implements Runnable {
 	
 	public void removeTextArea(int id) {
 		String msg = "R "+id;
+		byte bts[] = msg.getBytes();
+		try {
+			synchronized(out){
+		    out.write(bts.length & 255);
+		    out.write(bts.length >> 8);
+		    out.write(bts, 0, bts.length);
+		    out.flush();
+			}
+		} catch (IOException e) {
+		}
+	}
+	
+	public void sendGraphics(String msg) {
 		byte bts[] = msg.getBytes();
 		try {
 			synchronized(out){

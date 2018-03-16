@@ -18,6 +18,12 @@ public class Vrav extends Applet implements Runnable
 	private static final int port = 2004;
 	public int counter;
 	ServerSocket srv;
+	Button clear = new Button("Clear History");
+	Button smiley = new Button("Send smiley");
+	Button canv = new Button("Canvas");
+	Frame f= new Frame("Canvas");
+	Canvas c = new Canvas();
+	
 	
 	HashMap<Integer,ClientHandler> clients = new HashMap<>();
 	HashMap<Integer,TextArea> textAreas = new HashMap<>();
@@ -28,10 +34,15 @@ public class Vrav extends Applet implements Runnable
 	@Override
 	public void init()
 	{
-		add(t1); 	
+		add(t1); 
+		add(clear);
+		add(smiley);
+		add(canv);
 		Thread th = new Thread(this);
 		th.start();
-		listeners();
+		c.setSize(400,400);
+		f.add(c);
+		
 	}
 	
 	void listeners() {
@@ -44,6 +55,77 @@ public class Vrav extends Applet implements Runnable
 				sendMsg(msg);
 			}
 		});
+		
+		clear.addActionListener(new ActionListener() {
+
+			@Override
+			public void actionPerformed(ActionEvent arg0) {
+				// TODO Auto-generated method stub
+				for(Entry<Integer,TextArea> area: textAreas.entrySet()) {
+					area.getValue().setText("");
+				}
+			}
+			
+		});
+		
+		smiley.addActionListener(new ActionListener() {
+
+			@Override
+			public void actionPerformed(ActionEvent arg0) {
+				// TODO Auto-generated method stub
+				t1.setText(t1.getText() + "\uD83D\uDE40");
+			}
+			
+		});
+		
+		 //f.setLayout(null);  
+		 f.setSize(400, 400);
+		 
+		
+		canv.addActionListener(new ActionListener() {
+
+			@Override
+			public void actionPerformed(ActionEvent arg0) {
+				// TODO Auto-generated method stub
+				f.setVisible(true);
+			}
+			
+		});
+		
+		f.addWindowListener(new WindowAdapter(){
+			  public void windowClosing(WindowEvent we){
+			    f.setVisible(false);
+			  }
+			});
+		
+		c.addMouseMotionListener(new MouseMotionListener() {
+
+			@Override
+			public void mouseDragged(MouseEvent arg0) {
+				// TODO Auto-generated method stub
+				
+				if(srv != null) {
+					c.getGraphics().fillOval(arg0.getX(), arg0.getY(), 20, 20);
+					for(Entry<Integer,ClientHandler> c: clients.entrySet()) {
+						String d = "D "  + arg0.getX() + " " + arg0.getY();
+						c.getValue().sendGraphics(d);
+					}
+				}
+				else {
+					c.getGraphics().fillOval(arg0.getX(), arg0.getY(), 20, 20);
+					String d = "D "  + arg0.getX() + " " + arg0.getY();
+					sendCords(d);
+				}
+			}
+
+			@Override
+			public void mouseMoved(MouseEvent arg0) {
+				// TODO Auto-generated method stub
+				
+			}
+			
+		});
+		
 	}
 	
 	private void sendMsg(String msg) {
@@ -65,6 +147,35 @@ public class Vrav extends Applet implements Runnable
 				}
 				
 			}
+	}
+	
+
+	private void sendCords(String msg) {
+			if(srv == null) {
+				byte bts[] = msg.getBytes();
+				try {
+					synchronized(wr){
+				    wr.write(bts.length & 255);
+				    wr.write(bts.length >> 8);
+				    wr.write(bts, 0, bts.length);
+				    wr.flush();
+					}
+				} catch (IOException e) {
+					e.printStackTrace();
+				}
+			}
+	}
+	
+	public void draw(String msg) {
+		String[] p = msg.split(" ");
+		int x = Integer.parseInt(p[1]);
+		int y = Integer.parseInt(p[2]);
+		c.getGraphics().fillOval(x, y, 20, 20);
+		
+		for(Entry<Integer,ClientHandler> c: clients.entrySet()) {
+			c.getValue().sendGraphics(msg);
+		}
+		
 	}
 	
 	
@@ -98,10 +209,12 @@ public class Vrav extends Applet implements Runnable
 			  socket = new Socket("localhost", port);
 			  wr = socket.getOutputStream();
 			  rd = socket.getInputStream();
+			  listeners();
 			  while(getMsg());
 		}catch(Exception e){
 			try {
 				srv = new ServerSocket(port);
+				listeners();
 				//System.out.println("ServerClientCreated");
 				while(true){
 					waitingForConnection();
@@ -109,7 +222,7 @@ public class Vrav extends Applet implements Runnable
 				}
 			} catch (IOException e1) {
 				// TODO Auto-generated catch block
-				e1.printStackTrace();
+				//e1.printStackTrace();
 			}
 			
 		}
@@ -146,6 +259,11 @@ public class Vrav extends Applet implements Runnable
 					id = Integer.parseInt(msg[1]);
 					String text = msg[2];
 					textAreas.get(id).setText(text);
+					break;
+				case "D":
+					int x = Integer.parseInt(msg[1]);
+					int y = Integer.parseInt(msg[2]);
+					c.getGraphics().fillOval(x, y, 20, 20);
 					break;
 				default:
 					return false;
