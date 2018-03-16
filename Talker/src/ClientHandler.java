@@ -1,12 +1,11 @@
 import java.awt.TextArea;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
+import java.io.OutputStream;
 import java.net.Socket;
 
-import msg.AddAreaMsg;
-import msg.RemoveAreaMsg;
-import msg.Textt;
 
 public class ClientHandler implements Runnable {
 	
@@ -15,73 +14,101 @@ public class ClientHandler implements Runnable {
 		this.server = server;
 		this.socket = socket;
 		this.id = id;
-		out = new ObjectOutputStream(socket.getOutputStream());
-		inp = new ObjectInputStream(socket.getInputStream());
+		out = socket.getOutputStream();
+		inp = socket.getInputStream();
 		new Thread(this).start();
 	}
 
 	Vrav server;
 	Socket socket;
 	int id;
-	ObjectOutputStream out;
-	ObjectInputStream inp;
-	
+	OutputStream out;
+	InputStream inp;
 	
 	@Override
 	public void run() {
 		while(getMsg());
+		server.removeClient(id);
+		try {
+			socket.close();
+		} catch (IOException e) {
+		}
 	}
 
 
 	public void addTextArea(int id) {
+		String msg = "A "+id;
+		byte bts[] = msg.getBytes();
 		try {
-			out.writeObject(new AddAreaMsg(id));
+			synchronized(out){
+		    out.write(bts.length & 255);
+		    out.write(bts.length >> 8);
+		    out.write(bts, 0, bts.length);
+		    out.flush();
+			}
 		} catch (IOException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
 		}
 		
 	}
 	
 	public boolean getMsg() {
 		String cl;
-		try {
-			synchronized(inp) {
-				cl = (String) inp.readObject();
-			}
-			server.sendMsgForAll(id,cl);
-		} catch (Exception e) {
-			server.removeClient(id);
+		synchronized(inp){
+			cl = readAndcreateString();
+		}
+		if(cl == null) {
 			return false;
+		}
+		if(cl != "") {
+			server.sendMsgForAll(id, cl);
 		}
 		return true;
 	}
 	
 	
-	public void sendMsg(Textt text) {
+	public void sendMsg(String msg) {
+		byte bts[] = msg.getBytes();
 		try {
-			
-			synchronized(out) {
-				out.writeObject(text);
-				out.flush();
+			synchronized(out){
+		    out.write(bts.length & 255);
+		    out.write(bts.length >> 8);
+		    out.write(bts, 0, bts.length);
+		    out.flush();
 			}
 		} catch (IOException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
 		}
 		
 	}
 	
-	public void removeTextArea(RemoveAreaMsg area) {
+	public void removeTextArea(int id) {
+		String msg = "R "+id;
+		byte bts[] = msg.getBytes();
 		try {
-			
-			synchronized(out) {
-				out.writeObject(area);
-				out.flush();
+			synchronized(out){
+		    out.write(bts.length & 255);
+		    out.write(bts.length >> 8);
+		    out.write(bts, 0, bts.length);
+		    out.flush();
 			}
 		} catch (IOException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
+		}
+	}
+	
+	
+	public String readAndcreateString()
+	{
+		try {
+			int nbts = inp.read() + (inp.read() << 8);
+			byte bts[] = new byte[nbts];
+			int i = 0; // how many bytes did we read so far
+			do {
+				int j = inp.read(bts, i, bts.length - i);
+				if (j > 0) i += j;
+				else break;
+			} while (i < bts.length);
+			return new String(bts);
+		} catch (IOException e) {
+			return null;
 		}
 	}
 }

@@ -5,9 +5,8 @@ import java.io.*;
 import java.net.*;
 import java.util.HashMap;
 import java.util.Map.Entry;
-import msg.AddAreaMsg;
-import msg.RemoveAreaMsg;
-import msg.Textt;
+
+
 
 public class Vrav extends Applet implements Runnable
 {
@@ -23,8 +22,8 @@ public class Vrav extends Applet implements Runnable
 	HashMap<Integer,ClientHandler> clients = new HashMap<>();
 	HashMap<Integer,TextArea> textAreas = new HashMap<>();
 	
-	ObjectOutputStream wr; 
-	ObjectInputStream rd;
+	OutputStream wr; 
+	InputStream rd;
 	
 	@Override
 	public void init()
@@ -48,16 +47,24 @@ public class Vrav extends Applet implements Runnable
 	}
 	
 	private void sendMsg(String msg) {
-		try {
-			synchronized(wr) {
-				wr.writeObject(msg);
-				wr.flush();
+			if(srv == null) {
+				byte bts[] = msg.getBytes();
+				try {
+					synchronized(wr){
+				    wr.write(bts.length & 255);
+				    wr.write(bts.length >> 8);
+				    wr.write(bts, 0, bts.length);
+				    wr.flush();
+					}
+				} catch (IOException e) {
+					e.printStackTrace();
 				}
-			
-		} catch (IOException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
+			}else {
+				for(Entry<Integer,ClientHandler> c: clients.entrySet()) {
+					c.getValue().sendMsg("T 0 " + t1.getText());
+				}
+				
+			}
 	}
 	
 	
@@ -89,8 +96,8 @@ public class Vrav extends Applet implements Runnable
 	{
 		try{
 			  socket = new Socket("localhost", port);
-			  wr = new ObjectOutputStream(socket.getOutputStream());
-			  rd = new ObjectInputStream(socket.getInputStream());
+			  wr = socket.getOutputStream();
+			  rd = socket.getInputStream();
 			  while(getMsg());
 		}catch(Exception e){
 			try {
@@ -111,42 +118,51 @@ public class Vrav extends Applet implements Runnable
 	}
 	
 	public boolean getMsg()
-	{	synchronized(rd) {
-			try {
-				AddAreaMsg cl = (AddAreaMsg) rd.readObject();
-				TextArea area = new TextArea();
-				area.setEditable(false);
-				add(area);
-				this.doLayout();
-				textAreas.put(cl.id, area);
-			} catch (Exception e) {
-				try {
-					Textt t = (Textt) rd.readObject();
-					textAreas.get(t.id).setText(t.msg);
-					textAreas.get(t.id).doLayout();
-				}catch(Exception e1) {
-					try {
-						RemoveAreaMsg area = (RemoveAreaMsg) rd.readObject();
-						
-						clients.remove(area.id);
-						remove(textAreas.get(area.id));
-						textAreas.remove(area.id);
-						this.doLayout();
-						System.out.println("rempve");
-					}catch(Exception e2) {
-					}
-				}
+	{			
+		try{String str;
+			synchronized(rd) {
+				str = readAndcreateString();
 			}
+		if(str.length() > 0) {
+			
+				String[] msg = str.split(" ");
+				int id;
+				switch(msg[0]) {
+				case "A":
+					id = Integer.parseInt(msg[1]);
+					TextArea area = new TextArea();
+					area.setEditable(false);
+					add(area);
+					doLayout();
+					textAreas.put(id, area);
+					break;
+				case "R":
+					id = Integer.parseInt(msg[1]);
+					remove(textAreas.get(id));
+					textAreas.remove(id);
+					doLayout();
+					break;
+				case "T":
+					id = Integer.parseInt(msg[1]);
+					String text = msg[2];
+					textAreas.get(id).setText(text);
+					break;
+				default:
+					return false;
+				}
+				
+		}}catch(Exception e) {
 		}
 		return true;
 	}
 	
 	public void sendMsgForAll(int id, String text) {
+		String msg = "T " + id + " " + text;
+		textAreas.get(id).setText(text);
+		textAreas.get(id).doLayout();
 		for(Entry<Integer,ClientHandler> c: clients.entrySet()) {
-				textAreas.get(id).setText(text);
-				textAreas.get(id).doLayout();
 				if(id != c.getKey()) {
-					c.getValue().sendMsg(new Textt(id,text));
+					c.getValue().sendMsg(msg);
 				}
 		}
 	}
@@ -156,10 +172,28 @@ public class Vrav extends Applet implements Runnable
 		clients.remove(id);
 		remove(textAreas.get(id));
 		textAreas.remove(id);
-		System.out.println(clients + "..." + id);
 		for(Entry<Integer,ClientHandler> c: clients.entrySet()) {
-			c.getValue().removeTextArea(new RemoveAreaMsg(id));
+			c.getValue().removeTextArea(id);
 		}
+	}
+	
+	
+	public String readAndcreateString()
+	{
+		try {
+			int nbts = rd.read() + (rd.read() << 8);
+			byte bts[] = new byte[nbts];
+			int i = 0; // how many bytes did we read so far
+			do {
+				int j = rd.read(bts, i, bts.length - i);
+				if (j > 0) i += j;
+				else break;
+			} while (i < bts.length);
+			return new String(bts);
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+		return "";
 	}
 	
 	
