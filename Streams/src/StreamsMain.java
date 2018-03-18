@@ -31,9 +31,15 @@ public class StreamsMain {
     }
 	
 	public static int numberOfMinimal(int[] list) {
-		List<Integer> l = Arrays.stream(list).boxed().collect(Collectors.toList());
-		Long res = l.stream().collect(Collectors.groupingBy(Function.identity(), Collectors.counting()))
-				.get(l.stream().sorted().findFirst().get());
+		List<Integer> l = Arrays.stream(list)
+				.boxed()
+				.collect(Collectors.toList());
+		Long res = l.stream()
+				.collect(Collectors.groupingBy(Function.identity(), Collectors.counting()))
+				.get(l.stream()
+						.sorted()
+						.findFirst()
+						.get());
 		return res.intValue();
 	}
 	
