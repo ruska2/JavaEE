@@ -1,11 +1,3 @@
-/*
- * Hotove ulohy:
- * 1.
- * 4. kreslenie pre viacerych
- * 3. mazanie hystorie
- * 5. posielau sa iba zmeny bez moznostou editacie
- * */
-
 
 import java.applet.Applet;
 import java.awt.*;
@@ -19,6 +11,8 @@ import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.LinkedList;
+import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 
@@ -30,19 +24,18 @@ public class Vrav extends Applet implements Runnable
 {
 	private static final long serialVersionUID = -4297335882692216363L;
 
-	Socket socket;
+	SocketChannel socket;
 	TextArea t1 = new TextArea();
 	Thread th;
 	private static final int port = 2004;
 	public int counter;
-	String text = new String();
 	
+	Selector selector;
+	LinkedList pendingChanges = new LinkedList();
+	private Map pendingData = new HashMap();
 	
-	HashMap<Integer,ClientHandler> clients = new HashMap<>();
 	HashMap<Integer,TextArea> textAreas = new HashMap<>();
-	
-	OutputStream wr; 
-	InputStream rd;
+	HashMap<Integer,SocketChannel> clients = new HashMap<>();
 	
 	@Override
 	public void init()
@@ -50,7 +43,6 @@ public class Vrav extends Applet implements Runnable
 		add(t1); 
 		Thread th = new Thread(this);
 		th.start();
-		
 	}
 	
 	void listeners() {
@@ -58,31 +50,25 @@ public class Vrav extends Applet implements Runnable
 			
 			@Override
 			public void textValueChanged(TextEvent arg0) {
-				// TODO Auto-generated method stub
-				if(text.length() == 0 || text.length() <= t1.getText().length()) {
-					String msg = t1.getText();
-					sendMsg(msg.substring(msg.length()-1, msg.length()));
-				}else {
-					sendMsg("");
-				}
-				text = t1.getText();
-				
+				sendMsg(t1.getText());	
 			}
 		});
 	}
 	
 	private void sendMsg(String msg) {
-		byte bts[] = msg.getBytes();
-		try {
-			synchronized(wr){
-				wr.write(bts.length & 255);
-				wr.write(bts.length >> 8);
-				wr.write(bts, 0, bts.length);
-				wr.flush();
-				}
+		if(socket != null){
+			byte bts[] = msg.getBytes();
+			ByteBuffer buffer = ByteBuffer.wrap(bts);
+			try {
+				socket.write(buffer);
 			} catch (IOException e) {
+				// TODO Auto-generated catch block
 				e.printStackTrace();
+			}
+		}else {
+			sendMsgForAll(0,msg);
 		}
+		
 	}
 	
 	private void waitingForConnection() throws IOException
@@ -95,62 +81,97 @@ public class Vrav extends Applet implements Runnable
 	        ss.bind( address );
 	        
 	        
-	        SelectionKey key1 = ssc1.register( selector, SelectionKey.OP_ACCEPT );
-        
+	        SelectionKey selectKey = ssc1.register( selector, ssc1.validOps() );
+	        Iterator<SelectionKey> iter;
+	        SelectionKey key;
+	        
 			while(true) {
-				int num = selector.select();
-				Set selectedKeys = selector.selectedKeys();
-				Iterator it = selectedKeys.iterator();
+				selector.select();
+				iter = selector.selectedKeys().iterator();
 				
-				while(it.hasNext()) {
-					SelectionKey key = (SelectionKey)it.next();
-					if((key.readyOps() & SelectionKey.OP_READ) == SelectionKey.OP_READ) {
+				while(iter.hasNext()) {
+					key = iter.next();
+					iter.remove();
+					if(key.isReadable()) {
 						SocketChannel sc = (SocketChannel)key.channel();
-	                    ByteBuffer rb = ByteBuffer.allocate(1);
+	                    ByteBuffer rb = ByteBuffer.allocate(256);
 	                    sc.read(rb);
+	                    String x = new String(rb.array()).trim();
 	                    rb.flip();
-	                    //WRITE TO SPECIFIED CLIENT TEXT AREA
-	                    //SEND AND WRITE TO ALL CLIENTS 
+	                    
+	                    //GET KEY OF SENDER
+	                    int senderKey = -1;
+	                    for(Entry<Integer,SocketChannel> c: clients.entrySet()) {
+	    					if(sc.equals(c.getValue())){
+	    						senderKey = c.getKey();
+	    					}
+	    				}
+	                    
+	                    
+	                    //REMOVE CLIENT
+	                    if(x.length() == 0) {
+	                    	key.cancel();
+	                    	removeClient(senderKey);
+	                    	break;
+	                    }
+	                    
+	                    
+	                    textAreas.get(senderKey).setText(x);
+	                    sendMsgForAll(senderKey,x);
+	                    
 					}
-					else if ((key.readyOps() & SelectionKey.OP_ACCEPT) == SelectionKey.OP_ACCEPT)
+					else if (key.isAcceptable() && key.readyOps() == SelectionKey.OP_ACCEPT)
 	                {
 						System.out.println("New client arriving.");
-	                    ServerSocketChannel ssc = (ServerSocketChannel)key.channel();
-	                    SocketChannel sc = ssc.accept();	 
+						counter++;
+	                    SocketChannel sc = ssc1.accept();	 
 	                      
 	                    sc.configureBlocking( false );
-	                    SelectionKey newKey = sc.register( selector, SelectionKey.OP_READ );
+	                    sc.register( selector, SelectionKey.OP_READ );
 	                    
-	                    //ADD CLIENT
-	                    //MAKE NEW TEXT AREA
-	                    //ADD SERVER TO CLIENT WITH NEW TEXT AREA
+	                    TextArea clientArea = new TextArea();
+	    			    clientArea.setEditable(false);
+	    			    textAreas.put(counter, clientArea);
+	    			    clients.put(counter, sc);
+	    			    add(clientArea);
+	    			    this.doLayout();
+	    			    
+	    			    //CREATE TEXT AREA 0 IN ALL CLIENTS
+	    			    byte bts[] = ("A 0").getBytes();
+						ByteBuffer buffer = ByteBuffer.wrap(bts);
+						try {
+							sc.write(buffer);
+						} catch (IOException e) {
+							// TODO Auto-generated catch block
+							e.printStackTrace();
+						}
+						
+						
+	    			    
+	    			    // CREATE TEXT AREA IN ALL CLIENTS
+	    			    for(Entry<Integer,SocketChannel> c: clients.entrySet()) {
+	    					if(counter != c.getKey()) {
+	    						SocketChannel s = c.getValue();
+	    						bts = ("A " + counter).getBytes();
+	    						buffer = ByteBuffer.wrap(bts);
+	    						s.write(buffer);
+	    						sleep(20);
+									
+	    					}
+	    				}
+	    			    
+	    			    
+	    			    for(Entry<Integer,SocketChannel> c: clients.entrySet()) {
+	    					if(counter != c.getKey()) {
+	    						 bts = ("A " + c.getKey()).getBytes();
+	    						 buffer = ByteBuffer.wrap(bts);
+	    						 sc.write(buffer);
+	    						 sleep(20);
+	    					}
+	    				}
 	                }
-					else {
-						//REMOVE CLIENT FROM clients
-						//REMOVE text area
-					}
 				}
 				
-				
-				
-				/*counter++;
-			    ClientHandler client = new ClientHandler(this, s, counter);
-				clients.put(counter,client);
-			    TextArea clientArea = new TextArea();
-			    clientArea.setEditable(false);
-			    textAreas.put(counter, clientArea);
-			    //System.out.println("client" + counter +" connected");
-			    add(clientArea);
-			    this.doLayout();
-			    client.addTextArea(0);
-				new Thread(client).start();
-				
-				for(Entry<Integer,ClientHandler> c: clients.entrySet()) {
-					if(counter != c.getKey()) {
-						c.getValue().addTextArea(counter);
-						client.addTextArea(c.getKey());
-					}
-				}*/
 			}
 			
 			
@@ -159,9 +180,8 @@ public class Vrav extends Applet implements Runnable
 	public void run() 
 	{
 		try{
-			  socket = new Socket("localhost", port);
-			  wr = socket.getOutputStream();
-			  rd = socket.getInputStream();
+			  InetSocketAddress crunchifyAddr = new InetSocketAddress("localhost", port);
+			  socket = SocketChannel.open(crunchifyAddr);
 			  listeners();
 			  while(getMsg());
 		}catch(Exception e){
@@ -180,10 +200,7 @@ public class Vrav extends Applet implements Runnable
 	
 	public boolean getMsg()
 	{			
-		try{String str;
-			synchronized(rd) {
-				str = readAndcreateString();
-			}
+		String str = readAndcreateString();
 		if(str.length() > 0) {
 			
 				String[] msg = str.split(" ");
@@ -207,35 +224,30 @@ public class Vrav extends Applet implements Runnable
 				case "T":
 					//System.out.println(msg.length);
 					id = Integer.parseInt(msg[1]);
-					if(msg.length > 2) {
-						String text = msg[2];
-						textAreas.get(id).setText(textAreas.get(id).getText() + text);
-					}else {
-						String t = textAreas.get(id).getText();
-						textAreas.get(id).setText(t.substring(0,t.length()-1));
-					}
+					String text = msg[2];
+					textAreas.get(id).setText(text);
 					break;
 				default:
 					return false;
 				}
 				
-		}}catch(Exception e) {
 		}
 		return true;
 	}
 	
 	public void sendMsgForAll(int id, String text) {
 		String msg = "T " + id + " " + text;
-		if(text.equals("")) {
-			String t = textAreas.get(id).getText();
-			textAreas.get(id).setText(t.substring(0,t.length()-1));
-		}else {
-			textAreas.get(id).setText(textAreas.get(id).getText() + text);
-		}
-		textAreas.get(id).doLayout();
-		for(Entry<Integer,ClientHandler> c: clients.entrySet()) {
+		for(Entry<Integer,SocketChannel> c: clients.entrySet()) {
 				if(id != c.getKey()) {
-					c.getValue().sendMsg(msg);
+					 byte bts[] = (msg).getBytes();
+					 ByteBuffer buffer = ByteBuffer.wrap(bts);
+						try {
+							c.getValue().write(buffer);
+						} catch (IOException e) {
+							// TODO Auto-generated catch block
+							//e.printStackTrace();
+						}
+						
 				}
 		}
 	}
@@ -245,8 +257,16 @@ public class Vrav extends Applet implements Runnable
 		clients.remove(id);
 		remove(textAreas.get(id));
 		textAreas.remove(id);
-		for(Entry<Integer,ClientHandler> c: clients.entrySet()) {
-			c.getValue().removeTextArea(id);
+		for(Entry<Integer,SocketChannel> c: clients.entrySet()) {
+			String msg = "R " + id;
+			byte bts[] = msg.getBytes();
+			ByteBuffer buffer = ByteBuffer.wrap(bts);
+			try {
+				c.getValue().write(buffer);
+			} catch (IOException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
 		}
 	}
 	
@@ -254,20 +274,31 @@ public class Vrav extends Applet implements Runnable
 	public String readAndcreateString()
 	{
 		try {
-			int nbts = rd.read() + (rd.read() << 8);
-			byte bts[] = new byte[nbts];
-			int i = 0; // how many bytes did we read so far
-			do {
-				int j = rd.read(bts, i, bts.length - i);
-				if (j > 0) i += j;
-				else break;
-			} while (i < bts.length);
-			return new String(bts);
+			ByteBuffer rb = ByteBuffer.allocate(256);
+            socket.read(rb);
+            String x = new String(rb.array()).trim();
+            rb.flip();
+            return x;
 		} catch (IOException e) {
-			e.printStackTrace();
+	
 		}
 		return "";
 	}
 	
+	private void sleep(int time) 
+	{
+		try {
+			Thread.sleep(time);
+		} catch (InterruptedException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+	}
 	
+	@Override
+	public void destroy() {
+		System.out.println("socket closed");
+		sendMsg(Character.toString((char) 27));
+		sleep(200);
+	}
 }
