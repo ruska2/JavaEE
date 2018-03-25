@@ -107,8 +107,6 @@ public class Vrav extends Applet implements Runnable
 	    					}
 	    				}
 	                    
-	                    
-	                    //REMOVE CLIENT
 	                    if(x.length() == 0) {
 	                    	key.cancel();
 	                    	removeClient(senderKey);
