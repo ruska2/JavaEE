@@ -1,9 +1,9 @@
 /*
  * Hotove ulohy:
- * 1.
+ * 1. 
  * 4. kreslenie pre viacerych
  * 3. mazanie hystorie
- * 5. posielau sa iba zmeny bez moznostou editacie
+ * 5. posielau sa iba zmeny, editacia - čiastočne iba mazanie od konca
  * */
 
 
@@ -14,10 +14,6 @@ import java.io.*;
 import java.net.*;
 import java.util.HashMap;
 import java.util.Map.Entry;
-
-
-
-
 
 public class Vrav extends Applet implements Runnable
 {
@@ -127,7 +123,7 @@ public class Vrav extends Applet implements Runnable
 			}
 
 			@Override
-			public void mouseMoved(MouseEvent arg0) {
+			public void mouseMoved(MouseEvent e) {
 				// TODO Auto-generated method stub
 				
 			}
