@@ -11,13 +11,7 @@ import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.util.HashMap;
 import java.util.Iterator;
-import java.util.LinkedList;
-import java.util.Map;
 import java.util.Map.Entry;
-import java.util.Set;
-
-
-
 
 
 public class Vrav extends Applet implements Runnable
@@ -31,8 +25,6 @@ public class Vrav extends Applet implements Runnable
 	public int counter;
 	
 	Selector selector;
-	LinkedList pendingChanges = new LinkedList();
-	private Map pendingData = new HashMap();
 	
 	HashMap<Integer,TextArea> textAreas = new HashMap<>();
 	HashMap<Integer,SocketChannel> clients = new HashMap<>();
@@ -80,8 +72,7 @@ public class Vrav extends Applet implements Runnable
 	        InetSocketAddress address = new InetSocketAddress( port );
 	        ss.bind( address );
 	        
-	        
-	        SelectionKey selectKey = ssc1.register( selector, ssc1.validOps() );
+	        ssc1.register( selector, ssc1.validOps() );
 	        Iterator<SelectionKey> iter;
 	        SelectionKey key;
 	        
@@ -143,10 +134,8 @@ public class Vrav extends Applet implements Runnable
 							// TODO Auto-generated catch block
 							e.printStackTrace();
 						}
-						
-						
 	    			    
-	    			    // CREATE TEXT AREA IN ALL CLIENTS
+						
 	    			    for(Entry<Integer,SocketChannel> c: clients.entrySet()) {
 	    					if(counter != c.getKey()) {
 	    						SocketChannel s = c.getValue();
@@ -190,10 +179,7 @@ public class Vrav extends Applet implements Runnable
 				// TODO Auto-generated catch block
 				//e1.printStackTrace();
 			}
-			
 		}
-		
-		
 	}
 	
 	public boolean getMsg()
@@ -220,7 +206,6 @@ public class Vrav extends Applet implements Runnable
 					doLayout();
 					break;
 				case "T":
-					//System.out.println(msg.length);
 					id = Integer.parseInt(msg[1]);
 					String text = msg[2];
 					textAreas.get(id).setText(text);
@@ -242,8 +227,6 @@ public class Vrav extends Applet implements Runnable
 						try {
 							c.getValue().write(buffer);
 						} catch (IOException e) {
-							// TODO Auto-generated catch block
-							//e.printStackTrace();
 						}
 						
 				}
@@ -278,7 +261,6 @@ public class Vrav extends Applet implements Runnable
             rb.flip();
             return x;
 		} catch (IOException e) {
-	
 		}
 		return "";
 	}
@@ -295,7 +277,6 @@ public class Vrav extends Applet implements Runnable
 	
 	@Override
 	public void destroy() {
-		System.out.println("socket closed");
 		sendMsg(Character.toString((char) 27));
 		sleep(200);
 	}
