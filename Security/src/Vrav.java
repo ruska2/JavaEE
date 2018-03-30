@@ -9,11 +9,13 @@ import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
+import java.security.PrivateKey;
+import java.security.PublicKey;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map.Entry;
 
-import security.SecurityHandler;
+import security.KeyGenerator;
 
 
 public class Vrav extends Applet implements Runnable
@@ -25,6 +27,8 @@ public class Vrav extends Applet implements Runnable
 	Thread th;
 	private static final int port = 2004;
 	public int counter;
+	PublicKey publicKey;
+	PrivateKey privateKey;
 	
 	Selector selector;
 	
@@ -162,8 +166,6 @@ public class Vrav extends Applet implements Runnable
 				}
 				
 			}
-			
-			
 	}
 
 	public void run() 
@@ -171,12 +173,16 @@ public class Vrav extends Applet implements Runnable
 		try{
 			  InetSocketAddress crunchifyAddr = new InetSocketAddress("localhost", port);
 			  socket = SocketChannel.open(crunchifyAddr);
+			  publicKey = KeyGenerator.getPublicKeyFromFile();
+			  System.out.println("asdasda" + publicKey);
 			  listeners();
+			  
 			  while(getMsg());
 		}catch(Exception e){
 			try {
 				listeners();
-				new SecurityHandler().writeKeysToFiles();
+				privateKey = KeyGenerator.getPrivateKeyFromFile();
+				System.out.println("lalal" + privateKey);
 				waitingForConnection();
 			} catch (IOException e1) {
 				// TODO Auto-generated catch block
@@ -282,5 +288,13 @@ public class Vrav extends Applet implements Runnable
 	public void destroy() {
 		sendMsg(Character.toString((char) 27));
 		sleep(200);
+	}
+	
+	private byte[] encodeString(String input) {
+		return null;
+	}
+	
+	private String decodeString(byte[] br) {
+		return null;
 	}
 }

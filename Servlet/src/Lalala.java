@@ -62,7 +62,7 @@ public class Lalala extends HttpServlet {
             times.put(meno, System.currentTimeMillis());
                 
             for(Entry<String, Long> c: times.entrySet()) {
-            	if(System.currentTimeMillis() - c.getValue() > 15000){
+            	if(System.currentTimeMillis() - c.getValue() > 1000*60*5){
             			zoznamLudi = zoznamLudi.replace(", " + c.getKey(),"");
             			zoznamLudi = zoznamLudi.replace(c.getKey() + ",", "");
             			ctx.setAttribute("zoznam", zoznamLudi);
