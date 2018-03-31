@@ -16,7 +16,7 @@ public class KeyGenerator {
 	
 	public static void main(String[] args) {
 		new KeyGenerator().writeKeysToFiles();
-		System.out.println("Keys generated to bin folder!");
+		System.out.println("Keys generated!");
 	}
 	
 	KeyPair key;

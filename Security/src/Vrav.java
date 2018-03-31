@@ -1,39 +1,48 @@
 
+
+
 import java.applet.Applet;
 import java.awt.*;
 import java.awt.event.*;
 import java.io.*;
 import java.net.*;
 import java.nio.ByteBuffer;
-import java.nio.channels.SelectionKey;
-import java.nio.channels.Selector;
-import java.nio.channels.ServerSocketChannel;
-import java.nio.channels.SocketChannel;
+import java.security.KeyFactory;
+import java.security.KeyPair;
+import java.security.KeyPairGenerator;
 import java.security.PrivateKey;
 import java.security.PublicKey;
+import java.security.spec.X509EncodedKeySpec;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.Map.Entry;
 
-import security.KeyGenerator;
+import javax.crypto.Cipher;
 
+import security.KeyGenerator;
 
 public class Vrav extends Applet implements Runnable
 {
 	private static final long serialVersionUID = -4297335882692216363L;
 
-	SocketChannel socket;
+	Socket socket;
 	TextArea t1 = new TextArea();
 	Thread th;
 	private static final int port = 2004;
 	public int counter;
-	PublicKey publicKey;
-	PrivateKey privateKey;
+	ServerSocket srv;
 	
-	Selector selector;
+	PublicKey serverPublicKey;
+	PrivateKey serverPrivateKey;
+	PublicKey clientPublicKey;
+	PrivateKey clientPrivateKey;
 	
+
+	HashMap<Integer,PublicKey> clientKeys = new HashMap<>();
+	HashMap<Integer,ClientHandler> clients = new HashMap<>();
 	HashMap<Integer,TextArea> textAreas = new HashMap<>();
-	HashMap<Integer,SocketChannel> clients = new HashMap<>();
+	
+	OutputStream wr; 
+	InputStream rd;
 	
 	@Override
 	public void init()
@@ -41,6 +50,7 @@ public class Vrav extends Applet implements Runnable
 		add(t1); 
 		Thread th = new Thread(this);
 		th.start();
+		
 	}
 	
 	void listeners() {
@@ -48,152 +58,102 @@ public class Vrav extends Applet implements Runnable
 			
 			@Override
 			public void textValueChanged(TextEvent arg0) {
-				sendMsg(t1.getText());	
+				// TODO Auto-generated method stub
+				String msg = t1.getText();
+				sendMsg(msg);
 			}
 		});
-	}
-	
-	private void sendMsg(String msg) {
-		if(socket != null){
-			byte bts[] = msg.getBytes();
-			ByteBuffer buffer = ByteBuffer.wrap(bts);
-			try {
-				socket.write(buffer);
-			} catch (IOException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
-			}
-		}else {
-			sendMsgForAll(0,msg);
-		}
 		
 	}
 	
-	private void waitingForConnection() throws IOException
-	{
-			Selector selector = Selector.open();
-	        ServerSocketChannel ssc1 = ServerSocketChannel.open();
-	        ssc1.configureBlocking( false );
-	        ServerSocket ss = ssc1.socket();
-	        InetSocketAddress address = new InetSocketAddress( port );
-	        ss.bind( address );
-	        
-	        ssc1.register( selector, ssc1.validOps() );
-	        Iterator<SelectionKey> iter;
-	        SelectionKey key;
-	        
-			while(true) {
-				selector.select();
-				iter = selector.selectedKeys().iterator();
-				
-				while(iter.hasNext()) {
-					key = iter.next();
-					iter.remove();
-					if(key.isReadable()) {
-						SocketChannel sc = (SocketChannel)key.channel();
-	                    ByteBuffer rb = ByteBuffer.allocate(256);
-	                    sc.read(rb);
-	                    String x = new String(rb.array()).trim();
-	                    rb.flip();
-	                    
-	                    //GET KEY OF SENDER
-	                    int senderKey = -1;
-	                    for(Entry<Integer,SocketChannel> c: clients.entrySet()) {
-	    					if(sc.equals(c.getValue())){
-	    						senderKey = c.getKey();
-	    					}
-	    				}
-	                    
-	                    if(x.length() == 0) {
-	                    	key.cancel();
-	                    	removeClient(senderKey);
-	                    	break;
-	                    }
-	                    
-	                    
-	                    textAreas.get(senderKey).setText(x);
-	                    sendMsgForAll(senderKey,x);
-	                    
+	private void sendMsg(String msg) {
+			if(srv == null) {
+				byte bts[] = encodeString(msg, serverPublicKey);
+				try {
+					synchronized(wr){
+				    wr.write(bts.length & 255);
+				    wr.write(bts.length >> 8);
+				    wr.write(bts, 0, bts.length);
+				    wr.flush();
 					}
-					else if (key.isAcceptable() && key.readyOps() == SelectionKey.OP_ACCEPT)
-	                {
-						System.out.println("New client arriving.");
-						counter++;
-	                    SocketChannel sc = ssc1.accept();	 
-	                      
-	                    sc.configureBlocking( false );
-	                    sc.register( selector, SelectionKey.OP_READ );
-	                    
-	                    TextArea clientArea = new TextArea();
-	    			    clientArea.setEditable(false);
-	    			    textAreas.put(counter, clientArea);
-	    			    clients.put(counter, sc);
-	    			    add(clientArea);
-	    			    this.doLayout();
-	    			    
-	    			    //CREATE TEXT AREA 0 IN ALL CLIENTS
-	    			    byte bts[] = ("A 0").getBytes();
-						ByteBuffer buffer = ByteBuffer.wrap(bts);
-						try {
-							sc.write(buffer);
-						} catch (IOException e) {
-							// TODO Auto-generated catch block
-							e.printStackTrace();
-						}
-	    			    
-						
-	    			    for(Entry<Integer,SocketChannel> c: clients.entrySet()) {
-	    					if(counter != c.getKey()) {
-	    						SocketChannel s = c.getValue();
-	    						bts = ("A " + counter).getBytes();
-	    						buffer = ByteBuffer.wrap(bts);
-	    						s.write(buffer);
-	    						sleep(20);
-									
-	    					}
-	    				}
-	    			    
-	    			    
-	    			    for(Entry<Integer,SocketChannel> c: clients.entrySet()) {
-	    					if(counter != c.getKey()) {
-	    						 bts = ("A " + c.getKey()).getBytes();
-	    						 buffer = ByteBuffer.wrap(bts);
-	    						 sc.write(buffer);
-	    						 sleep(20);
-	    					}
-	    				}
-	                }
+				} catch (IOException e) {
+					e.printStackTrace();
+				}
+			}else {
+				for(Entry<Integer,ClientHandler> c: clients.entrySet()) {
+					c.getValue().sendMsg(encodeString("T 0 " + msg,clientKeys.get(c.getKey())));
 				}
 				
 			}
+	}
+	
+	
+	private void waitingForConnection() throws IOException
+	{
+			Socket s = srv.accept();
+			counter++;
+		    ClientHandler client = new ClientHandler(this, s, counter);
+			clients.put(counter,client);
+		    TextArea clientArea = new TextArea();
+		    clientArea.setEditable(false);
+		    textAreas.put(counter, clientArea);
+		    //System.out.println("client" + counter +" connected");
+		    add(clientArea);
+		    this.doLayout();
+		    client.addTextArea(0);
+			new Thread(client).start();
+			
+			for(Entry<Integer,ClientHandler> c: clients.entrySet()) {
+				if(counter != c.getKey()) {
+					c.getValue().addTextArea(counter);
+					client.addTextArea(c.getKey());
+				}
+			}
+			
 	}
 
 	public void run() 
 	{
 		try{
-			  InetSocketAddress crunchifyAddr = new InetSocketAddress("localhost", port);
-			  socket = SocketChannel.open(crunchifyAddr);
-			  publicKey = KeyGenerator.getPublicKeyFromFile();
-			  System.out.println("asdasda" + publicKey);
-			  listeners();
+			  socket = new Socket("localhost", port);
+			  wr = socket.getOutputStream();
+			  rd = socket.getInputStream();
+			  serverPublicKey = KeyGenerator.getPublicKeyFromFile();
+			
+			  KeyPair mainKeyPair = KeyPairGenerator.getInstance("RSA").generateKeyPair();
+			  clientPrivateKey = mainKeyPair.getPrivate();
+			  clientPublicKey = mainKeyPair.getPublic();
+			  sleep(100);
 			  
+			  sendClientPublickKey();
+			  listeners();
 			  while(getMsg());
 		}catch(Exception e){
 			try {
+				srv = new ServerSocket(port);
 				listeners();
-				privateKey = KeyGenerator.getPrivateKeyFromFile();
-				System.out.println("lalal" + privateKey);
-				waitingForConnection();
+				serverPrivateKey = KeyGenerator.getPrivateKeyFromFile();
+				//System.out.println("ServerClientCreated");
+				while(true){
+					waitingForConnection();
+					//System.out.println("waiting again client connected");
+				}
 			} catch (IOException e1) {
 				// TODO Auto-generated catch block
 				//e1.printStackTrace();
 			}
+			
 		}
+		
+		
 	}
 	
 	public boolean getMsg()
 	{			
-		String str = readAndcreateString();
+		try{String str;
+			synchronized(rd) {
+				str = readAndcreateString();
+			}
 		if(str.length() > 0) {
 			
 				String[] msg = str.split(" ");
@@ -215,6 +175,7 @@ public class Vrav extends Applet implements Runnable
 					doLayout();
 					break;
 				case "T":
+					//System.out.println(msg.length);
 					id = Integer.parseInt(msg[1]);
 					String text = msg[2];
 					textAreas.get(id).setText(text);
@@ -223,21 +184,19 @@ public class Vrav extends Applet implements Runnable
 					return false;
 				}
 				
+		}}catch(Exception e) {
 		}
 		return true;
 	}
 	
-	public void sendMsgForAll(int id, String text) {
-		String msg = "T " + id + " " + text;
-		for(Entry<Integer,SocketChannel> c: clients.entrySet()) {
+	public void sendMsgForAll(int id, byte[] text) {
+		String t = decodeString(text, serverPrivateKey);
+		String msg = "T " + id + " " +  t;
+		textAreas.get(id).setText(t);
+		textAreas.get(id).doLayout();
+		for(Entry<Integer,ClientHandler> c: clients.entrySet()) {
 				if(id != c.getKey()) {
-					 byte bts[] = (msg).getBytes();
-					 ByteBuffer buffer = ByteBuffer.wrap(bts);
-						try {
-							c.getValue().write(buffer);
-						} catch (IOException e) {
-						}
-						
+					c.getValue().sendMsg(encodeString(msg, clientKeys.get(c.getKey())));
 				}
 		}
 	}
@@ -247,16 +206,8 @@ public class Vrav extends Applet implements Runnable
 		clients.remove(id);
 		remove(textAreas.get(id));
 		textAreas.remove(id);
-		for(Entry<Integer,SocketChannel> c: clients.entrySet()) {
-			String msg = "R " + id;
-			byte bts[] = msg.getBytes();
-			ByteBuffer buffer = ByteBuffer.wrap(bts);
-			try {
-				c.getValue().write(buffer);
-			} catch (IOException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
-			}
+		for(Entry<Integer,ClientHandler> c: clients.entrySet()) {
+			c.getValue().removeTextArea(encodeString("R " + id, clientKeys.get(c.getKey())));
 		}
 	}
 	
@@ -264,14 +215,74 @@ public class Vrav extends Applet implements Runnable
 	public String readAndcreateString()
 	{
 		try {
-			ByteBuffer rb = ByteBuffer.allocate(256);
-            socket.read(rb);
-            String x = new String(rb.array()).trim();
-            rb.flip();
-            return x;
+			int nbts = rd.read() + (rd.read() << 8);
+			byte bts[] = new byte[nbts];
+			int i = 0; // how many bytes did we read so far
+			do {
+				int j = rd.read(bts, i, bts.length - i);
+				if (j > 0) i += j;
+				else break;
+			} while (i < bts.length);
+			String x = decodeString(bts, clientPrivateKey);
+			if(!x.equals("")) return x;
+			return new String(bts);
 		} catch (IOException e) {
+			e.printStackTrace();
 		}
 		return "";
+	}
+	
+	
+	private byte[] encodeString(String input, PublicKey key) {
+		try {
+			Cipher crypto = Cipher.getInstance("RSA");
+			crypto.init(Cipher.ENCRYPT_MODE, key);
+			return crypto.doFinal(input.getBytes());
+		}catch (Exception e) {
+			e.printStackTrace();
+		}
+		return null;
+	}
+	
+	private String decodeString(byte[] br, PrivateKey key) {
+		try{
+			Cipher crypto = Cipher.getInstance("RSA");
+			crypto.init(Cipher.DECRYPT_MODE, key);
+			return new String(crypto.doFinal(br));
+		}catch(Exception e) {
+			//e.printStackTrace();
+		}
+		return "";
+	}
+	
+	private void sendClientPublickKey() {
+		 X509EncodedKeySpec x509EncodedKeySpec = new X509EncodedKeySpec(
+					clientPublicKey.getEncoded());
+		byte[] bts = x509EncodedKeySpec.getEncoded();
+		try {
+				synchronized(wr){
+			    wr.write(bts.length & 255);
+			    wr.write(bts.length >> 8);
+			    wr.write(bts, 0, bts.length);
+			    wr.flush();
+				}
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		
+	}
+	
+	public void addClientWithKey(int id, byte[] b) {
+    	PublicKey publicKey = null;
+		try {
+			X509EncodedKeySpec x509EncodedKeySpec = new X509EncodedKeySpec(
+					b);
+			publicKey = KeyFactory.getInstance("RSA").generatePublic(x509EncodedKeySpec);
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+    	clientKeys.put(id, publicKey);
 	}
 	
 	private void sleep(int time) 
@@ -282,19 +293,5 @@ public class Vrav extends Applet implements Runnable
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
-	}
-	
-	@Override
-	public void destroy() {
-		sendMsg(Character.toString((char) 27));
-		sleep(200);
-	}
-	
-	private byte[] encodeString(String input) {
-		return null;
-	}
-	
-	private String decodeString(byte[] br) {
-		return null;
 	}
 }
