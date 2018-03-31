@@ -33,9 +33,7 @@ public class ClientHandler implements Runnable {
 	}
 
 
-	public void addTextArea(int id) {
-		String msg = "A "+id;
-		byte bts[] = msg.getBytes();
+	public void addTextArea(byte[] bts) {
 		try {
 			synchronized(out){
 		    out.write(bts.length & 255);
@@ -54,6 +52,7 @@ public class ClientHandler implements Runnable {
 			cl = readAndcreateBytes();
 			if(!server.clientKeys.containsKey(id)) {
 				server.addClientWithKey(id, cl);
+				server.addAreaToClients(id);
 				return true;
 			}
 			server.sendMsgForAll(id, cl);

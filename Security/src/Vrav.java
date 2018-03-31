@@ -100,16 +100,26 @@ public class Vrav extends Applet implements Runnable
 		    //System.out.println("client" + counter +" connected");
 		    add(clientArea);
 		    this.doLayout();
-		    client.addTextArea(0);
+		   // client.addTextArea(0);
 			new Thread(client).start();
 			
-			for(Entry<Integer,ClientHandler> c: clients.entrySet()) {
+			/*for(Entry<Integer,ClientHandler> c: clients.entrySet()) {
 				if(counter != c.getKey()) {
 					c.getValue().addTextArea(counter);
 					client.addTextArea(c.getKey());
 				}
-			}
+			}*/
 			
+	}
+	
+	public void addAreaToClients(int id) {
+		clients.get(id).addTextArea(encodeString("A 0", clientKeys.get(id)));
+		for(Entry<Integer,ClientHandler> c: clients.entrySet()) {
+			if(id != c.getKey()) {
+				c.getValue().addTextArea(encodeString("A " +id, clientKeys.get(c.getKey())));
+				clients.get(id).addTextArea(encodeString("A "+c.getKey(), clientKeys.get(id)));
+			}
+		}
 	}
 
 	public void run() 
@@ -200,6 +210,8 @@ public class Vrav extends Applet implements Runnable
 				}
 		}
 	}
+	
+
 	
 	
 	public void removeClient(int id) {
