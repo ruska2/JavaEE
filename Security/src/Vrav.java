@@ -34,6 +34,7 @@ public class Vrav extends Applet implements Runnable
 	private static final String signature = "SIGNATURE";
 	public int counter;
 	public int msgcounter;
+	public int servermsg;
 	ServerSocket srv;
 	
 	PublicKey serverPublicKey;
@@ -50,6 +51,7 @@ public class Vrav extends Applet implements Runnable
 
 	HashMap<Integer,PublicKey> clientKeys = new HashMap<>();
 	HashMap<Integer,Integer> clientMsgCount = new HashMap<>();
+	HashMap<Integer,Integer> serverClientMsgCount = new HashMap<>();
 	HashMap<Integer,PublicKey> clientSignkeys = new HashMap<>();
 	HashMap<Integer,ClientHandler> clients = new HashMap<>();
 	HashMap<Integer,TextArea> textAreas = new HashMap<>();
@@ -97,7 +99,9 @@ public class Vrav extends Applet implements Runnable
 				}
 			}else {
 				for(Entry<Integer,ClientHandler> c: clients.entrySet()) {
-					String msg2 = "T 0 " + msg + "SIGNATURE" 
+					serverClientMsgCount.put(c.getKey(),serverClientMsgCount.get(c.getKey())+1);
+					int n = serverClientMsgCount.get(c.getKey());
+					String msg2 = n + " T 0 " + msg + "SIGNATURE" 
 							+ SignatureHandler.sign(("T 0 " + msg).getBytes(),serverPrivateSignKey);
 					c.getValue().sendMsg(encodeString(msg2, clientKeys.get(c.getKey())));
 				}
@@ -187,7 +191,8 @@ public class Vrav extends Applet implements Runnable
 	{			
 		try{String str;
 			synchronized(rd) {
-				str = readAndcreateString();
+				str = controllClientSideMsg();
+				
 				if(str.contains("SIGNATURE")) {
 					String signature = str.split("SIGNATURE")[1];
 					str = str.split("SIGNATURE")[0];
@@ -219,6 +224,7 @@ public class Vrav extends Applet implements Runnable
 					break;
 				case "T":
 					//System.out.println(msg.length);
+					servermsg++;
 					id = Integer.parseInt(msg[1]);
 					String text = msg[2];
 					textAreas.get(id).setText(text);
@@ -253,7 +259,8 @@ public class Vrav extends Applet implements Runnable
 		}
 		for(Entry<Integer,ClientHandler> c: clients.entrySet()) {
 				if(id != c.getKey()) {
-					c.getValue().sendMsg(encodeString(msg, clientKeys.get(c.getKey())));
+					serverClientMsgCount.put(c.getKey(),serverClientMsgCount.get(c.getKey())+1);
+					c.getValue().sendMsg(encodeString(serverClientMsgCount.get(c.getKey()) + " " + msg, clientKeys.get(c.getKey())));
 				}
 		}
 	}
@@ -395,6 +402,24 @@ public class Vrav extends Applet implements Runnable
 			System.out.println("PACKET MISSING!");
 		}
 		clientMsgCount.put(id, clientMsgCount.get(id)+1);
+		t = "";
+		for(int i = 1; i < number.length; i++) {
+			t += number[i] + " ";
+		}
+		t = t.substring(0,t.length()-1);
+		return t;
+	}
+	
+	public String controllClientSideMsg() {
+		String t  = readAndcreateString();
+		if(t.length() == 0) return t; 
+		String[] number = t.split(" ");
+		if(number.length == 2) {
+			return t;
+		}
+		if(!(Integer.parseInt(number[0]) == servermsg+1)){
+			System.out.println("PACKET MISSING! " + number[0] + "   " +servermsg);
+		}
 		t = "";
 		for(int i = 1; i < number.length; i++) {
 			t += number[i] + " ";
