@@ -46,6 +46,7 @@ public class Vrav extends Applet implements Runnable
 	
 
 	HashMap<Integer,PublicKey> clientKeys = new HashMap<>();
+	HashMap<Integer,PublicKey> clientSignkeys = new HashMap<>();
 	HashMap<Integer,ClientHandler> clients = new HashMap<>();
 	HashMap<Integer,TextArea> textAreas = new HashMap<>();
 	
@@ -76,7 +77,8 @@ public class Vrav extends Applet implements Runnable
 	
 	private void sendMsg(String msg) {
 			if(srv == null) {
-				byte bts[] = encodeString(msg + sign("".getBytes(),serverPrivateSignKey), serverPublicKey);
+				byte bts[] = encodeString(msg + "SIGNATURE" + 
+						sign("".getBytes(),clientPrivateSignKey), serverPublicKey);
 				try {
 					synchronized(wr){
 				    wr.write(bts.length & 255);
@@ -89,7 +91,8 @@ public class Vrav extends Applet implements Runnable
 				}
 			}else {
 				for(Entry<Integer,ClientHandler> c: clients.entrySet()) {
-					c.getValue().sendMsg(encodeString("T 0 " + msg + sign("".getBytes(),serverPrivateSignKey),clientKeys.get(c.getKey())));
+					c.getValue().sendMsg(encodeString("T 0 " + msg + "SIGNATURE" 
+							+ sign("".getBytes(),serverPrivateSignKey),clientKeys.get(c.getKey())));
 				}
 				
 			}
@@ -134,9 +137,19 @@ public class Vrav extends Applet implements Runnable
 			  KeyPair mainKeyPair = KeyPairGenerator.getInstance("RSA").generateKeyPair();
 			  clientPrivateKey = mainKeyPair.getPrivate();
 			  clientPublicKey = mainKeyPair.getPublic();
-			  sleep(100);
 			  
+			  KeyPairGenerator g = KeyPairGenerator.getInstance("RSA");
+			  g.initialize(1024);
+			  KeyPair key = g.generateKeyPair();
+			  
+			  
+			  clientPrivateSignKey = key.getPrivate();
+			  clientPublicSignKey = key.getPublic();
+				
+			  sleep(100);
 			  sendClientPublickKey();
+			  sleep(100);
+			  sendClientPublickSignKey();
 			  listeners();
 			  while(getMsg());
 		}catch(Exception e){
@@ -165,6 +178,14 @@ public class Vrav extends Applet implements Runnable
 		try{String str;
 			synchronized(rd) {
 				str = readAndcreateString();
+				if(str.contains("SIGNATURE")) {
+					String signature = str.split("SIGNATURE")[1];
+					if(!verify("", signature, serverPublicSignKey)) {
+						System.out.println("FAIL MSG NOT SIGNED!");
+					}
+					str = str.split("SIGNATURE")[0];
+				}
+				System.out.println(str);
 			}
 		if(str.length() > 0) {
 			
@@ -203,6 +224,18 @@ public class Vrav extends Applet implements Runnable
 	
 	public void sendMsgForAll(int id, byte[] text) {
 		String t = decodeString(text, serverPrivateKey);
+		if(t.contains("SIGNATURE")) {
+			String signature = t.split("SIGNATURE")[1];
+			t = t.split("SIGNATURE")[0];
+			try {
+				if(!verify("",signature,clientSignkeys.get(id))) {
+					System.out.println("SERVER SIDE BAD SIGNED MSG!");
+				}
+			} catch (Exception e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+		}
 		String msg = "T " + id + " " +  t;
 		textAreas.get(id).setText(t);
 		textAreas.get(id).doLayout();
@@ -288,6 +321,25 @@ public class Vrav extends Applet implements Runnable
 		
 	}
 	
+	private void sendClientPublickSignKey() {
+		 X509EncodedKeySpec x509EncodedKeySpec = new X509EncodedKeySpec(
+					clientPublicSignKey.getEncoded());
+		byte[] bts = x509EncodedKeySpec.getEncoded();
+		try {
+				synchronized(wr){
+			    wr.write(bts.length & 255);
+			    wr.write(bts.length >> 8);
+			    wr.write(bts, 0, bts.length);
+			    wr.flush();
+				}
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		
+	}
+	
+	
 	public void addClientWithKey(int id, byte[] b) {
     	PublicKey publicKey = null;
 		try {
@@ -298,6 +350,18 @@ public class Vrav extends Applet implements Runnable
 			e.printStackTrace();
 		}
     	clientKeys.put(id, publicKey);
+	}
+	
+	public void addClientWithSignKey(int id, byte[] b) {
+    	PublicKey publicKey = null;
+		try {
+			X509EncodedKeySpec x509EncodedKeySpec = new X509EncodedKeySpec(
+					b);
+			publicKey = KeyFactory.getInstance("RSA").generatePublic(x509EncodedKeySpec);
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+    	clientSignkeys.put(id, publicKey);
 	}
 	
 	private void sleep(int time) 

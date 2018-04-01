@@ -55,6 +55,10 @@ public class ClientHandler implements Runnable {
 				server.addAreaToClients(id);
 				return true;
 			}
+			if(!server.clientSignkeys.containsKey(id)) {
+				server.addClientWithSignKey(id, cl);
+				return true;
+			}
 			server.sendMsgForAll(id, cl);
 		}
 		if(cl == null) {
