@@ -57,6 +57,7 @@ public class ClientHandler implements Runnable {
 			}
 			if(!server.clientSignkeys.containsKey(id)) {
 				server.addClientWithSignKey(id, cl);
+				server.clientMsgCount.put(id, 1);
 				return true;
 			}
 			server.sendMsgForAll(id, cl);

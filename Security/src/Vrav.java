@@ -21,6 +21,7 @@ import java.util.Map.Entry;
 import javax.crypto.Cipher;
 
 import security.KeyGenerator;
+import security.SignatureHandler;
 
 public class Vrav extends Applet implements Runnable
 {
@@ -30,7 +31,9 @@ public class Vrav extends Applet implements Runnable
 	TextArea t1 = new TextArea();
 	Thread th;
 	private static final int port = 2004;
+	private static final String signature = "SIGNATURE";
 	public int counter;
+	public int msgcounter;
 	ServerSocket srv;
 	
 	PublicKey serverPublicKey;
@@ -46,6 +49,7 @@ public class Vrav extends Applet implements Runnable
 	
 
 	HashMap<Integer,PublicKey> clientKeys = new HashMap<>();
+	HashMap<Integer,Integer> clientMsgCount = new HashMap<>();
 	HashMap<Integer,PublicKey> clientSignkeys = new HashMap<>();
 	HashMap<Integer,ClientHandler> clients = new HashMap<>();
 	HashMap<Integer,TextArea> textAreas = new HashMap<>();
@@ -69,6 +73,7 @@ public class Vrav extends Applet implements Runnable
 			public void textValueChanged(TextEvent arg0) {
 				// TODO Auto-generated method stub
 				String msg = t1.getText();
+				msgcounter++;
 				sendMsg(msg);
 			}
 		});
@@ -77,8 +82,9 @@ public class Vrav extends Applet implements Runnable
 	
 	private void sendMsg(String msg) {
 			if(srv == null) {
-				byte bts[] = encodeString(msg + "SIGNATURE" + 
-						sign(msg.getBytes(),clientPrivateSignKey), serverPublicKey);
+				String msg2 = msgcounter+" "+ msg + signature + 
+						SignatureHandler.sign(msg.getBytes(),clientPrivateSignKey);
+				byte bts[] = encodeString(msg2, serverPublicKey);
 				try {
 					synchronized(wr){
 				    wr.write(bts.length & 255);
@@ -91,8 +97,9 @@ public class Vrav extends Applet implements Runnable
 				}
 			}else {
 				for(Entry<Integer,ClientHandler> c: clients.entrySet()) {
-					c.getValue().sendMsg(encodeString("T 0 " + msg + "SIGNATURE" 
-							+ sign(("T 0 " + msg) .getBytes(),serverPrivateSignKey),clientKeys.get(c.getKey())));
+					String msg2 = "T 0 " + msg + "SIGNATURE" 
+							+ SignatureHandler.sign(("T 0 " + msg).getBytes(),serverPrivateSignKey);
+					c.getValue().sendMsg(encodeString(msg2, clientKeys.get(c.getKey())));
 				}
 				
 			}
@@ -120,9 +127,9 @@ public class Vrav extends Applet implements Runnable
 		for(Entry<Integer,ClientHandler> c: clients.entrySet()) {
 			if(id != c.getKey()) {
 				c.getValue().addTextArea(encodeString("A " +id +"SIGNATURE" + 
-						sign(("A " +id).getBytes(),serverPrivateSignKey), clientKeys.get(c.getKey())));
+						SignatureHandler.sign(("A " +id).getBytes(),serverPrivateSignKey), clientKeys.get(c.getKey())));
 				clients.get(id).addTextArea(encodeString("A "+c.getKey() + "SIGNATURE" +
-						sign(("A "+c.getKey()).getBytes(),serverPrivateSignKey), clientKeys.get(id)));
+						SignatureHandler.sign(("A "+c.getKey()).getBytes(),serverPrivateSignKey), clientKeys.get(id)));
 			}
 		}
 	}
@@ -151,8 +158,9 @@ public class Vrav extends Applet implements Runnable
 			  sleep(100);
 			  sendClientPublickKey();
 			  sleep(100);
-			  sendClientPublickSignKey();
+			  sendClientPublicSignKey();
 			  listeners();
+			  msgcounter = 0;
 			  while(getMsg());
 		}catch(Exception e){
 			try {
@@ -183,7 +191,7 @@ public class Vrav extends Applet implements Runnable
 				if(str.contains("SIGNATURE")) {
 					String signature = str.split("SIGNATURE")[1];
 					str = str.split("SIGNATURE")[0];
-					if(!verify(str, signature, serverPublicSignKey)) {
+					if(!SignatureHandler.verify(str, signature, serverPublicSignKey)) {
 						System.out.println("FAIL MSG NOT SIGNED!");
 					}
 					
@@ -225,12 +233,12 @@ public class Vrav extends Applet implements Runnable
 	}
 	
 	public void sendMsgForAll(int id, byte[] text) {
-		String t = decodeString(text, serverPrivateKey);
+		String t = controllServerSideMsg(id, text);
 		if(t.contains("SIGNATURE")) {
 			String signature = t.split("SIGNATURE")[1];
 			t = t.split("SIGNATURE")[0];
 			try {
-				if(!verify(t,signature,clientSignkeys.get(id))) {
+				if(!SignatureHandler.verify(t,signature,clientSignkeys.get(id))) {
 					System.out.println("SERVER SIDE BAD SIGNED MSG!");
 				}
 			} catch (Exception e) {
@@ -250,8 +258,6 @@ public class Vrav extends Applet implements Runnable
 		}
 	}
 	
-
-	
 	
 	public void removeClient(int id) {
 		clients.remove(id);
@@ -261,7 +267,7 @@ public class Vrav extends Applet implements Runnable
 		textAreas.remove(id);
 		for(Entry<Integer,ClientHandler> c: clients.entrySet()) {
 			c.getValue().removeTextArea(encodeString("R " + id + "SIGNATURE" + 
-					sign(("R " + id).getBytes(),serverPrivateSignKey), clientKeys.get(c.getKey())));
+					SignatureHandler.sign(("R " + id).getBytes(),serverPrivateSignKey), clientKeys.get(c.getKey())));
 		}
 	}
 	
@@ -328,7 +334,7 @@ public class Vrav extends Applet implements Runnable
 		
 	}
 	
-	private void sendClientPublickSignKey() {
+	private void sendClientPublicSignKey() {
 		 X509EncodedKeySpec x509EncodedKeySpec = new X509EncodedKeySpec(
 					clientPublicSignKey.getEncoded());
 		byte[] bts = x509EncodedKeySpec.getEncoded();
@@ -381,29 +387,20 @@ public class Vrav extends Applet implements Runnable
 		}
 	}
 	
-	public static String sign(byte[] plainText, PrivateKey privateKey){
-	    try{
-	    	Signature privateSignature = Signature.getInstance("NONEwithRSA");
-	    	privateSignature.initSign(privateKey);
-		    privateSignature.update(plainText);
-
-		    byte[] signature = privateSignature.sign();
-		    return Base64.getEncoder().encodeToString(signature);
-	    }
-	    catch(Exception e) {
-	    	e.printStackTrace();
-	    }
-		return null;
-	    
+	public String controllServerSideMsg(int id, byte[] text) {
+		String t = decodeString(text, serverPrivateKey);
+		if(t.length() == 0) return t; 
+		String[] number = t.split(" ");
+		if(!(Integer.parseInt(number[0]) == clientMsgCount.get(id))){
+			System.out.println("PACKET MISSING!");
+		}
+		clientMsgCount.put(id, clientMsgCount.get(id)+1);
+		t = "";
+		for(int i = 1; i < number.length; i++) {
+			t += number[i] + " ";
+		}
+		t = t.substring(0,t.length()-1);
+		return t;
 	}
 	
-	public static boolean verify(String plainText, String signature, PublicKey publicKey) throws Exception {
-	    Signature publicSignature = Signature.getInstance("NONEwithRSA");
-	    publicSignature.initVerify(publicKey);
-	    publicSignature.update(plainText.getBytes());
-
-	    byte[] signatureBytes = Base64.getDecoder().decode(signature);
-
-	    return publicSignature.verify(signatureBytes);
-	}
 }
