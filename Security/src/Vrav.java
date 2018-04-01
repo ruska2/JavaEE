@@ -12,7 +12,9 @@ import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.PrivateKey;
 import java.security.PublicKey;
+import java.security.Signature;
 import java.security.spec.X509EncodedKeySpec;
+import java.util.Base64;
 import java.util.HashMap;
 import java.util.Map.Entry;
 
@@ -35,6 +37,12 @@ public class Vrav extends Applet implements Runnable
 	PrivateKey serverPrivateKey;
 	PublicKey clientPublicKey;
 	PrivateKey clientPrivateKey;
+	
+	
+	PublicKey serverPublicSignKey;
+	PrivateKey serverPrivateSignKey;
+	PublicKey clientPublicSignKey;
+	PrivateKey clientPrivateSignKey;
 	
 
 	HashMap<Integer,PublicKey> clientKeys = new HashMap<>();
@@ -68,7 +76,7 @@ public class Vrav extends Applet implements Runnable
 	
 	private void sendMsg(String msg) {
 			if(srv == null) {
-				byte bts[] = encodeString(msg, serverPublicKey);
+				byte bts[] = encodeString(msg + sign("".getBytes(),serverPrivateSignKey), serverPublicKey);
 				try {
 					synchronized(wr){
 				    wr.write(bts.length & 255);
@@ -81,7 +89,7 @@ public class Vrav extends Applet implements Runnable
 				}
 			}else {
 				for(Entry<Integer,ClientHandler> c: clients.entrySet()) {
-					c.getValue().sendMsg(encodeString("T 0 " + msg,clientKeys.get(c.getKey())));
+					c.getValue().sendMsg(encodeString("T 0 " + msg + sign("".getBytes(),serverPrivateSignKey),clientKeys.get(c.getKey())));
 				}
 				
 			}
@@ -100,15 +108,7 @@ public class Vrav extends Applet implements Runnable
 		    //System.out.println("client" + counter +" connected");
 		    add(clientArea);
 		    this.doLayout();
-		   // client.addTextArea(0);
 			new Thread(client).start();
-			
-			/*for(Entry<Integer,ClientHandler> c: clients.entrySet()) {
-				if(counter != c.getKey()) {
-					c.getValue().addTextArea(counter);
-					client.addTextArea(c.getKey());
-				}
-			}*/
 			
 	}
 	
@@ -129,6 +129,7 @@ public class Vrav extends Applet implements Runnable
 			  wr = socket.getOutputStream();
 			  rd = socket.getInputStream();
 			  serverPublicKey = KeyGenerator.getPublicKeyFromFile();
+			  serverPublicSignKey = KeyGenerator.getPublicSignKeyFromFile();
 			
 			  KeyPair mainKeyPair = KeyPairGenerator.getInstance("RSA").generateKeyPair();
 			  clientPrivateKey = mainKeyPair.getPrivate();
@@ -143,6 +144,7 @@ public class Vrav extends Applet implements Runnable
 				srv = new ServerSocket(port);
 				listeners();
 				serverPrivateKey = KeyGenerator.getPrivateKeyFromFile();
+				serverPrivateSignKey = KeyGenerator.getPrivateSignKeyFromFile();
 				//System.out.println("ServerClientCreated");
 				while(true){
 					waitingForConnection();
@@ -256,6 +258,7 @@ public class Vrav extends Applet implements Runnable
 		return null;
 	}
 	
+	
 	private String decodeString(byte[] br, PrivateKey key) {
 		try{
 			Cipher crypto = Cipher.getInstance("RSA");
@@ -305,5 +308,31 @@ public class Vrav extends Applet implements Runnable
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
+	}
+	
+	public static String sign(byte[] plainText, PrivateKey privateKey){
+	    try{
+	    	Signature privateSignature = Signature.getInstance("NONEwithRSA");
+	    	privateSignature.initSign(privateKey);
+		    privateSignature.update(plainText);
+
+		    byte[] signature = privateSignature.sign();
+		    return Base64.getEncoder().encodeToString(signature);
+	    }
+	    catch(Exception e) {
+	    	e.printStackTrace();
+	    }
+		return null;
+	    
+	}
+	
+	public static boolean verify(String plainText, String signature, PublicKey publicKey) throws Exception {
+	    Signature publicSignature = Signature.getInstance("NONEwithRSA");
+	    publicSignature.initVerify(publicKey);
+	    publicSignature.update(plainText.getBytes());
+
+	    byte[] signatureBytes = Base64.getDecoder().decode(signature);
+
+	    return publicSignature.verify(signatureBytes);
 	}
 }

@@ -20,10 +20,16 @@ public class KeyGenerator {
 	}
 	
 	KeyPair key;
+	KeyPair signkey;
 	
 	public KeyGenerator(){
 		try {
 			key = KeyPairGenerator.getInstance("RSA").generateKeyPair();
+			KeyPairGenerator g = KeyPairGenerator.getInstance("RSA");
+			g.initialize(1024);
+			signkey = g.generateKeyPair();
+			
+			
 		} catch (NoSuchAlgorithmException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
@@ -42,6 +48,8 @@ public class KeyGenerator {
 		try {
 			writePublicKeyToFile();
 			writePrivateKeyToFile();
+			writePublicSignKeyToFile();
+			writePrivateSignKeyToFile();
 		} catch (IOException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
@@ -67,6 +75,26 @@ public class KeyGenerator {
 		
 	}
 	
+	private void writePublicSignKeyToFile() throws IOException {
+	    X509EncodedKeySpec x509EncodedKeySpec = new X509EncodedKeySpec(
+				signkey.getPublic().getEncoded());
+	    FileOutputStream fos = new FileOutputStream("publicsign.key");
+		fos.write(x509EncodedKeySpec.getEncoded());
+		fos.close();
+	        
+		
+	}
+
+	private void writePrivateSignKeyToFile() throws IOException {
+		PKCS8EncodedKeySpec pkcs8EncodedKeySpec = new PKCS8EncodedKeySpec(
+				signkey.getPrivate()
+				.getEncoded());
+		FileOutputStream fos = new FileOutputStream("privatesign.key");
+		fos.write(pkcs8EncodedKeySpec.getEncoded());
+		fos.close();
+		
+	}
+	
 	public static PublicKey getPublicKeyFromFile() {
 		File filePublicKey = new File("../public.key");
 		FileInputStream fis = null;
@@ -79,6 +107,7 @@ public class KeyGenerator {
 		
 		X509EncodedKeySpec publicKeySpec = new X509EncodedKeySpec(
 				encodedPublicKey);
+		
 		KeyFactory keyFactory;
 			keyFactory = KeyFactory.getInstance("RSA");
 		PublicKey publicKey = keyFactory.generatePublic(publicKeySpec);
@@ -92,6 +121,54 @@ public class KeyGenerator {
 	
 	public static PrivateKey getPrivateKeyFromFile() {
 		File filePrivateKey = new File("../private.key");
+		FileInputStream fis = null;
+		try {
+			fis = new FileInputStream(filePrivateKey);
+
+		byte[] encodedPrivateKey = new byte[(int) filePrivateKey.length()];
+			fis.read(encodedPrivateKey);
+			fis.close();
+		
+		PKCS8EncodedKeySpec privateKeySpec = new PKCS8EncodedKeySpec(
+					encodedPrivateKey);
+		KeyFactory keyFactory;
+			keyFactory = KeyFactory.getInstance("RSA");
+		PrivateKey privateKey = keyFactory.generatePrivate(privateKeySpec);
+		return privateKey;
+		} catch (Exception e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		return null;	
+	}
+	
+	
+	public static PublicKey getPublicSignKeyFromFile() {
+		File filePublicKey = new File("../publicsign.key");
+		FileInputStream fis = null;
+		try {
+			fis = new FileInputStream(filePublicKey);
+
+		byte[] encodedPublicKey = new byte[(int) filePublicKey.length()];
+			fis.read(encodedPublicKey);
+			fis.close();
+		
+		X509EncodedKeySpec publicKeySpec = new X509EncodedKeySpec(
+				encodedPublicKey);
+		
+		KeyFactory keyFactory;
+			keyFactory = KeyFactory.getInstance("RSA");
+		PublicKey publicKey = keyFactory.generatePublic(publicKeySpec);
+		return publicKey;
+		} catch (Exception e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		return null;	
+	}
+	
+	public static PrivateKey getPrivateSignKeyFromFile() {
+		File filePrivateKey = new File("../privatesign.key");
 		FileInputStream fis = null;
 		try {
 			fis = new FileInputStream(filePrivateKey);
