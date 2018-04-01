@@ -78,7 +78,7 @@ public class Vrav extends Applet implements Runnable
 	private void sendMsg(String msg) {
 			if(srv == null) {
 				byte bts[] = encodeString(msg + "SIGNATURE" + 
-						sign("".getBytes(),clientPrivateSignKey), serverPublicKey);
+						sign(msg.getBytes(),clientPrivateSignKey), serverPublicKey);
 				try {
 					synchronized(wr){
 				    wr.write(bts.length & 255);
@@ -92,7 +92,7 @@ public class Vrav extends Applet implements Runnable
 			}else {
 				for(Entry<Integer,ClientHandler> c: clients.entrySet()) {
 					c.getValue().sendMsg(encodeString("T 0 " + msg + "SIGNATURE" 
-							+ sign("".getBytes(),serverPrivateSignKey),clientKeys.get(c.getKey())));
+							+ sign(("T 0 " + msg) .getBytes(),serverPrivateSignKey),clientKeys.get(c.getKey())));
 				}
 				
 			}
@@ -119,8 +119,10 @@ public class Vrav extends Applet implements Runnable
 		clients.get(id).addTextArea(encodeString("A 0", clientKeys.get(id)));
 		for(Entry<Integer,ClientHandler> c: clients.entrySet()) {
 			if(id != c.getKey()) {
-				c.getValue().addTextArea(encodeString("A " +id, clientKeys.get(c.getKey())));
-				clients.get(id).addTextArea(encodeString("A "+c.getKey(), clientKeys.get(id)));
+				c.getValue().addTextArea(encodeString("A " +id +"SIGNATURE" + 
+						sign(("A " +id).getBytes(),serverPrivateSignKey), clientKeys.get(c.getKey())));
+				clients.get(id).addTextArea(encodeString("A "+c.getKey() + "SIGNATURE" +
+						sign(("A "+c.getKey()).getBytes(),serverPrivateSignKey), clientKeys.get(id)));
 			}
 		}
 	}
@@ -180,12 +182,12 @@ public class Vrav extends Applet implements Runnable
 				str = readAndcreateString();
 				if(str.contains("SIGNATURE")) {
 					String signature = str.split("SIGNATURE")[1];
-					if(!verify("", signature, serverPublicSignKey)) {
+					str = str.split("SIGNATURE")[0];
+					if(!verify(str, signature, serverPublicSignKey)) {
 						System.out.println("FAIL MSG NOT SIGNED!");
 					}
-					str = str.split("SIGNATURE")[0];
+					
 				}
-				System.out.println(str);
 			}
 		if(str.length() > 0) {
 			
@@ -228,7 +230,7 @@ public class Vrav extends Applet implements Runnable
 			String signature = t.split("SIGNATURE")[1];
 			t = t.split("SIGNATURE")[0];
 			try {
-				if(!verify("",signature,clientSignkeys.get(id))) {
+				if(!verify(t,signature,clientSignkeys.get(id))) {
 					System.out.println("SERVER SIDE BAD SIGNED MSG!");
 				}
 			} catch (Exception e) {
@@ -237,8 +239,10 @@ public class Vrav extends Applet implements Runnable
 			}
 		}
 		String msg = "T " + id + " " +  t;
-		textAreas.get(id).setText(t);
-		textAreas.get(id).doLayout();
+		if(textAreas.get(id) != null) {
+			textAreas.get(id).setText(t);
+			textAreas.get(id).doLayout();
+		}
 		for(Entry<Integer,ClientHandler> c: clients.entrySet()) {
 				if(id != c.getKey()) {
 					c.getValue().sendMsg(encodeString(msg, clientKeys.get(c.getKey())));
@@ -251,10 +255,13 @@ public class Vrav extends Applet implements Runnable
 	
 	public void removeClient(int id) {
 		clients.remove(id);
-		remove(textAreas.get(id));
+		if(textAreas.get(id) != null) {
+			remove(textAreas.get(id));
+		}
 		textAreas.remove(id);
 		for(Entry<Integer,ClientHandler> c: clients.entrySet()) {
-			c.getValue().removeTextArea(encodeString("R " + id, clientKeys.get(c.getKey())));
+			c.getValue().removeTextArea(encodeString("R " + id + "SIGNATURE" + 
+					sign(("R " + id).getBytes(),serverPrivateSignKey), clientKeys.get(c.getKey())));
 		}
 	}
 	
