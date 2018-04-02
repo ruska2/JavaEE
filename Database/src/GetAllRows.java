@@ -23,7 +23,14 @@ public class GetAllRows{
       try{
     	createTable(con);
     	System.out.println("TABLE_RUSKA CREATED");
-      	insertRandoms(con);
+      	
+    	
+    	// POKROCILE FUNCKIA JDBC TRANSACTION, PREPARED STATEMENT, COMMIT, ROLLBACK
+      	insertRandomsJPA(con);
+      	
+      	// KLASICKY INSERT
+        //insertRandoms(con);
+      	
       	System.out.println("RANDOM 100 DATA INSERTED");
     	System.out.println("YELLOW OR RED CARS:");
       	System.out.println(getYellowOrRedCars(con));
@@ -126,5 +133,44 @@ public class GetAllRows{
 	  }
 	  
 	  return count;
+  }
+  
+  public static void insertRandomsJPA(Connection con){
+	  PreparedStatement insertRandom = null;
+	  String dbname = "TAB_RUSKA";
+	  String sql = "INSERT INTO "+ dbname +
+			  " VALUES(?,?,?)";
+	  
+	  try {
+		  con.setAutoCommit(false);
+		  insertRandom = con.prepareStatement(sql);
+		  for(int i = 1; i <= 100; i++) {
+			  insertRandom.setInt(1, i);
+			  insertRandom.setString(2, cars[rnd.nextInt(cars.length)]);
+			  insertRandom.setString(3, colors[rnd.nextInt(colors.length)]);
+			  insertRandom.execute();
+			  con.commit();
+		 }
+	  }
+	  catch(Exception e) {
+	        if (con != null) {
+	            try {
+	                System.err.print("Transaction is being rolled back");
+	                con.rollback();
+	            } catch(SQLException excep) {
+	            	excep.printStackTrace();
+	            }
+	        }
+	  }finally {
+		  if(insertRandom != null)
+			try {
+				insertRandom.close();
+				con.setAutoCommit(true);
+			} catch (SQLException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+	  }
+	  
   }
 }
