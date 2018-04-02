@@ -21,25 +21,35 @@ public class GetAllRows{
       Class.forName(driver).newInstance();
       con = DriverManager.getConnection(url+db, user, pass);
       try{
+    	  
+    	  //VYTVORENIE TABULKY
     	createTable(con);
     	System.out.println("TABLE_RUSKA CREATED");
-      	
     	
+    	// 100 RANDOM AUT S RANDOM FARBOU PRIDANE DO DB
     	// POKROCILE FUNCKIA JDBC TRANSACTION, PREPARED STATEMENT, COMMIT, ROLLBACK
       	insertRandomsJPA(con);
-      	
       	// KLASICKY INSERT
         //insertRandoms(con);
-      	
       	System.out.println("RANDOM 100 DATA INSERTED");
-    	System.out.println("YELLOW OR RED CARS:");
+    	
+      	//VYPIS CERVEN A ZLTE AUTA
+      	System.out.println("YELLOW OR RED CARS:");
       	System.out.println(getYellowOrRedCars(con));
-      	paintYellowAndRedCarsToBlack(con);
+      	
+      	//PREFARBI TIETO AUTA NA CIERNU
       	System.out.println("REPAINT YELLOW AND RED CARS");
+      	paintYellowAndRedCarsToBlack(con);
+      	
+      	// VYMAZ OSTATNE AUTA
       	deleteOtherCars(con);
       	System.out.println("DELETE OTHER CARS");
+      	
+      	//VYPIS OSTAVAJUCE AUTA
       	System.out.println("Remaining cars count: " + countReimainingRows(con));
-    	dropTable(con);
+    	
+      	//ZRUS TABULKU
+      	dropTable(con);
     	System.out.println("TABLE_RUSKA DROPED");
     	
     	

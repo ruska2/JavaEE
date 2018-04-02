@@ -59,6 +59,8 @@ public class Vrav extends Applet implements Runnable
 	OutputStream wr; 
 	InputStream rd;
 	
+	String text = new String();
+	
 	@Override
 	public void init()
 	{
@@ -74,9 +76,16 @@ public class Vrav extends Applet implements Runnable
 			@Override
 			public void textValueChanged(TextEvent arg0) {
 				// TODO Auto-generated method stub
-				String msg = t1.getText();
+				
 				msgcounter++;
-				sendMsg(msg);
+				
+				if(text.length() == 0 || text.length() <= t1.getText().length()) {
+					String msg = t1.getText();
+					sendMsg(msg.substring(msg.length()-1, msg.length()));
+				}else {
+					sendMsg("");
+				}
+				text = t1.getText();
 			}
 		});
 		
@@ -226,8 +235,13 @@ public class Vrav extends Applet implements Runnable
 					//System.out.println(msg.length);
 					servermsg++;
 					id = Integer.parseInt(msg[1]);
-					String text = msg[2];
-					textAreas.get(id).setText(text);
+					if(msg.length > 2) {
+						String text = msg[2];
+						textAreas.get(id).setText(textAreas.get(id).getText() + text);
+					}else {
+						String t = textAreas.get(id).getText();
+						textAreas.get(id).setText(t.substring(0,t.length()-1));
+					}
 					break;
 				default:
 					return false;
@@ -254,7 +268,14 @@ public class Vrav extends Applet implements Runnable
 		}
 		String msg = "T " + id + " " +  t;
 		if(textAreas.get(id) != null) {
-			textAreas.get(id).setText(t);
+			if(t.equals("")) {
+				String t1 = textAreas.get(id).getText();
+				if(t1.length() > 0) {
+					textAreas.get(id).setText(t1.substring(0,t1.length()-1));
+				}
+			}else {
+				textAreas.get(id).setText(textAreas.get(id).getText() + t);
+			}
 			textAreas.get(id).doLayout();
 		}
 		for(Entry<Integer,ClientHandler> c: clients.entrySet()) {
