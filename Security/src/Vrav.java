@@ -156,11 +156,12 @@ public class Vrav extends Applet implements Runnable
 			  serverPublicKey = KeyGenerator.getPublicKeyFromFile();
 			  serverPublicSignKey = KeyGenerator.getPublicSignKeyFromFile();
 			
-			  KeyPair mainKeyPair = KeyPairGenerator.getInstance("RSA").generateKeyPair();
+			  KeyPairGenerator g = KeyPairGenerator.getInstance("RSA");
+			  g.initialize(2048);
+			  KeyPair mainKeyPair = g.generateKeyPair();
 			  clientPrivateKey = mainKeyPair.getPrivate();
 			  clientPublicKey = mainKeyPair.getPublic();
 			  
-			  KeyPairGenerator g = KeyPairGenerator.getInstance("RSA");
 			  g.initialize(1024);
 			  KeyPair key = g.generateKeyPair();
 			  
@@ -168,9 +169,9 @@ public class Vrav extends Applet implements Runnable
 			  clientPrivateSignKey = key.getPrivate();
 			  clientPublicSignKey = key.getPublic();
 				
-			  sleep(100);
+			  sleep(20);
 			  sendClientPublickKey();
-			  sleep(100);
+			  sleep(20);
 			  sendClientPublicSignKey();
 			  listeners();
 			  msgcounter = 0;

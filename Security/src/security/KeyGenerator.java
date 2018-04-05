@@ -24,8 +24,9 @@ public class KeyGenerator {
 	
 	public KeyGenerator(){
 		try {
-			key = KeyPairGenerator.getInstance("RSA").generateKeyPair();
 			KeyPairGenerator g = KeyPairGenerator.getInstance("RSA");
+			g.initialize(2048);
+			key = g.generateKeyPair();
 			g.initialize(1024);
 			signkey = g.generateKeyPair();
 			

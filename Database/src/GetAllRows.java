@@ -1,3 +1,9 @@
+/*
+ * Hotove:
+ * 1.
+ * 2. stored procedures, transaction, commit, rollback insertRandomsJPA()
+ * */
+
 import java.sql.*;
 import java.util.ArrayList;
 import java.util.Random;
