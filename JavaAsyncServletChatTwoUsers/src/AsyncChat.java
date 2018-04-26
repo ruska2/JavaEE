@@ -1,13 +1,11 @@
-/*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
- */
 
 
+import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import javax.servlet.AsyncContext;
 import javax.servlet.AsyncEvent;
@@ -28,14 +26,12 @@ class WaitForMessage implements AsyncListener
         this.ac = ac;
     }    
         
-    public void newMessage()
+    public void newMessage(String msg)
     {
-        ArrayList<String> msgs = (ArrayList<String>) ac.getRequest().getServletContext().getAttribute("msgs");
         try {
             PrintWriter out = ac.getResponse().getWriter();
             out.println("<msgs>");
-            for (String m: msgs)       
-                out.println("<line>" + m + "</line>");
+            out.println("<line>" + msg + "</line>");
             out.println("</msgs>");
         } catch (Exception e) {}
         ac.complete();
@@ -43,7 +39,7 @@ class WaitForMessage implements AsyncListener
 
     private void removeMeFromQueue()
     {
-        ArrayList<WaitForMessage> waiting = (ArrayList<WaitForMessage>) ac.getRequest().getServletContext().getAttribute("waiting");
+    	HashMap<String, WaitForMessage> waiting = AsyncChat.names;
         synchronized(waiting)
         {
             waiting.remove(this);
@@ -57,7 +53,7 @@ class WaitForMessage implements AsyncListener
 
     @Override
     public void onTimeout(AsyncEvent event) throws IOException {
-        newMessage();
+        newMessage("");
     }
 
     @Override
@@ -73,7 +69,9 @@ class WaitForMessage implements AsyncListener
 
 @WebServlet(name = "AsyncChat", urlPatterns = {"/asyncchat"}, asyncSupported = true)
 public class AsyncChat extends HttpServlet {
-
+	
+	 //public static ArrayList<WaitForMessage> waiting = new ArrayList<WaitForMessage>();
+	 public static HashMap<String, WaitForMessage> names = new HashMap<>();
     /**
      * Processes requests for both HTTP <code>GET</code> and <code>POST</code>
      * methods.
@@ -86,20 +84,12 @@ public class AsyncChat extends HttpServlet {
     protected void processRequest(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
         AsyncContext ac = request.startAsync();
-        ArrayList<WaitForMessage> waiting = (ArrayList<WaitForMessage>) request.getServletContext().getAttribute("waiting");
-        
-        if (waiting == null)
-        {
-            waiting = new ArrayList<WaitForMessage>();
-            request.getServletContext().setAttribute("waiting", waiting);
-        }
+
         WaitForMessage waiter = new WaitForMessage(ac);
         ac.addListener(waiter);
-        waiting.add(waiter);
-                
-        response.setContentType("text/xml");
-        response.setHeader("Cache-Control", "private, no-store, no-cache, must-revalidate");
-        response.setHeader("Pragma", "no-cache");
+        String all = request.getQueryString();
+        String meno = all.split("=")[1];
+        names.put(meno, waiter);
     }
 
 
@@ -128,8 +118,7 @@ public class AsyncChat extends HttpServlet {
      */
     @Override
     protected void doPost(HttpServletRequest request, HttpServletResponse response)
-            throws ServletException, IOException {
-        processRequest(request, response);
+            throws ServletException, IOException {  
     }
 
     /**

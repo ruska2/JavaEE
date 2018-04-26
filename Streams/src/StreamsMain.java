@@ -11,6 +11,8 @@ public class StreamsMain {
 	public static void main(String[] args) {
 		int[] x = {4,6,3,9,3,1,1,1};
 		int[][] x1 = {{1,2,3,6},{3,2,8,6},{1,8,3,6}};
+		List<Integer> l1 = Arrays.asList(1,2,3);
+		List<Integer> l2 = Arrays.asList(3,4,5);
 		System.out.println(diffEvenOdd(x));
 		System.out.println(getPrimes(100));
 		System.out.println(numberOfMinimal(x));
@@ -88,4 +90,5 @@ public class StreamsMain {
 				.collect(Collectors.toList());
 
 	}
+	
 }

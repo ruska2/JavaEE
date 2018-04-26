@@ -1,14 +1,10 @@
-/*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
- */
-package java.chat;
+
 
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.ArrayList;
-import java.util.concurrent.ScheduledThreadPoolExecutor;
+import java.util.Map.Entry;
+
 import javax.servlet.AsyncContext;
 import javax.servlet.AsyncEvent;
 import javax.servlet.AsyncListener;
@@ -17,33 +13,38 @@ import javax.servlet.annotation.WebServlet;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
-
-
-class WaitForMessage implements AsyncListener 
+class WaitForPost implements AsyncListener 
 {
     AsyncContext ac;
+    HttpServletRequest request;
+    String name;
     
-    public WaitForMessage(AsyncContext ac)
+    
+    public WaitForPost(AsyncContext ac, HttpServletRequest request)
     {
         this.ac = ac;
+        this.request = request;
     }    
         
     public void newMessage()
     {
-        ArrayList<String> msgs = (ArrayList<String>) ac.getRequest().getServletContext().getAttribute("msgs");
         try {
-            PrintWriter out = ac.getResponse().getWriter();
-            out.println("<msgs>");
-            for (String m: msgs)       
-                out.println("<line>" + m + "</line>");
-            out.println("</msgs>");
+        	String msg = request.getParameter("msg");
+        	String meno = request.getParameter("meno");
+        	
+        	for (Entry<String, WaitForMessage> entry : AsyncChat.names.entrySet())
+        	{
+        		if(!meno.equals(entry.getKey())) {
+        			entry.getValue().newMessage(meno +": "+ msg);
+        		}
+        	}
         } catch (Exception e) {}
         ac.complete();
     }
 
     private void removeMeFromQueue()
     {
-        ArrayList<WaitForMessage> waiting = (ArrayList<WaitForMessage>) ac.getRequest().getServletContext().getAttribute("waiting");
+        ArrayList<WaitForPost> waiting = ChatServlet.posts;
         synchronized(waiting)
         {
             waiting.remove(this);
@@ -57,7 +58,6 @@ class WaitForMessage implements AsyncListener
 
     @Override
     public void onTimeout(AsyncEvent event) throws IOException {
-        newMessage();
     }
 
     @Override
@@ -71,8 +71,10 @@ class WaitForMessage implements AsyncListener
     }
 }
 
-@WebServlet(name = "AsyncChat", urlPatterns = {"/asyncchat"}, asyncSupported = true)
-public class AsyncChat extends HttpServlet {
+@WebServlet(name = "ChatServlet", urlPatterns = {"/chatservlet"}, asyncSupported = true)
+public class ChatServlet extends HttpServlet {
+    
+	public static ArrayList<WaitForPost> posts = new ArrayList<>();
 
     /**
      * Processes requests for both HTTP <code>GET</code> and <code>POST</code>
@@ -85,23 +87,9 @@ public class AsyncChat extends HttpServlet {
      */
     protected void processRequest(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
-        AsyncContext ac = request.startAsync();
-        ArrayList<WaitForMessage> waiting = (ArrayList<WaitForMessage>) request.getServletContext().getAttribute("waiting");
-        
-        if (waiting == null)
-        {
-            waiting = new ArrayList<WaitForMessage>();
-            request.getServletContext().setAttribute("waiting", waiting);
-        }
-        WaitForMessage waiter = new WaitForMessage(ac);
-        ac.addListener(waiter);
-        waiting.add(waiter);
-                
-        response.setContentType("text/xml");
-        response.setHeader("Cache-Control", "private, no-store, no-cache, must-revalidate");
-        response.setHeader("Pragma", "no-cache");
-    }
 
+	    	
+    }
 
     // <editor-fold defaultstate="collapsed" desc="HttpServlet methods. Click on the + sign on the left to edit the code.">
     /**
@@ -115,7 +103,30 @@ public class AsyncChat extends HttpServlet {
     @Override
     protected void doGet(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
-        processRequest(request, response);
+    	 response.setContentType("text/html;charset=UTF-8");
+    	 
+         try (PrintWriter out = response.getWriter()) {
+        	 out.println("<!DOCTYPE html>");
+             out.println("<html>");
+             out.println("<head>");
+             out.println("<title>chat servlet</title>"); 
+             out.println("<meta charset=\"UTF-8\">");
+             out.println("<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">");
+             out.println("<script type='text/javascript' src='chat.js?ver=\" + version + \"'></script>");
+             out.println("<script src=\"http://code.jquery.com/jquery-1.10.2.js\"></script>");
+             out.println("</head>");
+             out.println("<body onload='startRequest()'>");
+             out.println("<h3>"+ request.getParameter("meno") +"</h3>");
+             out.println("<hr>");
+             out.println("Message: <br> <input type='text' name='msg' onkeydown=\"sendPost()\" />");
+             out.println("<input type=\"hidden\" name=\"meno\" value=\""+ request.getParameter("meno") +"\">");
+             out.println("<div id = \"msgs\"></div>");
+             out.println("</body>");
+             out.println("</html>");
+         }catch(Exception e) {
+         
+         }
+       
     }
 
     /**
@@ -129,7 +140,18 @@ public class AsyncChat extends HttpServlet {
     @Override
     protected void doPost(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
-        processRequest(request, response);
+    	AsyncContext ac = request.startAsync();
+
+        WaitForPost waiter = new WaitForPost(ac,request);
+        ac.addListener(waiter);
+        posts.add(waiter);
+   
+                
+        response.setContentType("text/xml");
+        response.setHeader("Cache-Control", "private, no-store, no-cache, must-revalidate");
+        response.setHeader("Pragma", "no-cache");
+        
+        waiter.newMessage();
     }
 
     /**

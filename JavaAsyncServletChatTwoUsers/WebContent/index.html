@@ -6,16 +6,15 @@ and open the template in the editor.
 -->
 <html>
     <head>
-        <title>chat servlet</title>
+        <title>Login</title>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
     </head>
     <body>
-        <div>Welcome to chat server, login first</div>
-        
-        <form action="chatservlet" method="POST">
-            <input name="nickname" type="text" />
-            <input name="submit" type="submit" value="login" />
+        <div>Zadaj svoje meno:</div>
+        <form action="/JavaAsyncServletChatTwoUsers/chatservlet" method="GET">
+            <input type="text" name="meno" size="30">
+            <input type="submit" name="login" value="login">
         </form>
     </body>
 </html>
